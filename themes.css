@@ -1,0 +1,247 @@
+/* ==========================================================================
+   Темы оформления
+   Подключается отдельно, не влияет на основной CSS
+   ========================================================================== */
+
+/* ---------- Базовая тема (dark) ---------- */
+:root,
+[data-theme="dark"] {
+  --bg: #1F1220;
+  --surface: #2A1B2E;
+  --border: #4A3350;
+  --text-primary: #F5EDE4;
+  --text-secondary: #C9B8C7;
+  --primary: #E8A94C;
+  --primary-hover: #F2C173;
+  --text-inverse: #241521;
+  --bg-rgb: 31, 18, 32;
+  --primary-rgb: 232, 169, 76;
+  --shadow-rgb: 0, 0, 0;
+}
+
+/* ---------- Тема Sunset ---------- */
+[data-theme="sunset"] {
+  --bg: #151c19;
+  --surface: #2f3834;
+  --border: #424f4a;
+  --text-primary: #ecd2c5;
+  --text-secondary: #C0AB92;
+  --primary: #C0AB92;
+  --primary-hover: #d4bfa8;
+  --text-inverse: #151c19;
+  --bg-rgb: 21, 28, 25;
+  --primary-rgb: 192, 171, 146;
+  --shadow-rgb: 0, 0, 0;
+}
+
+/* ---------- Тема Sunrise ---------- */
+[data-theme="sunrise"] {
+  --bg: #ecd2c5;
+  --surface: #f3e8e5;
+  --border: #d7c9c6;
+  --text-primary: #4f2733;
+  --text-secondary: #685844;
+  --primary: #a04d66;
+  --primary-hover: #b8607a;
+  --text-inverse: #f3e8e5;
+  --bg-rgb: 236, 210, 197;
+  --primary-rgb: 160, 77, 102;
+  --shadow-rgb: 79, 39, 51;
+}
+
+/* ---------- Тема Light ---------- */
+[data-theme="light"] {
+  --bg: #F7F8F9;
+  --surface: #FFFFFF;
+  --border: #E2E2E6;
+  --text-primary: #201C22;
+  --text-secondary: #6B6570;
+  --primary: #C97C2E;
+  --primary-hover: #DE9750;
+  --text-inverse: #FFFFFF;
+  --bg-rgb: 247, 247, 248;
+  --primary-rgb: 201, 124, 46;
+  --shadow-rgb: 30, 30, 35;
+}
+
+/* ---------- Плавное переключение ---------- */
+* {
+  transition: background-color 0.3s ease,
+              color 0.3s ease,
+              border-color 0.3s ease,
+              box-shadow 0.3s ease,
+              background 0.3s ease;
+}
+
+/* Отключаем transition для элементов, которые не должны анимироваться */
+.site-header,
+.scroll-top,
+.nav-list {
+  transition: background-color 0.3s ease,
+              border-color 0.3s ease,
+              opacity 0.3s ease,
+              transform 0.3s ease,
+              visibility 0.3s ease;
+}
+
+/* ---------- Стили для переключателя тем ---------- */
+.theme-toggle-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-left: 8px;
+}
+
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 0;
+  position: relative;
+}
+
+.theme-toggle-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: scale(1.05);
+}
+
+.theme-toggle-btn svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+/* ---------- Выпадающее меню тем ---------- */
+.theme-dropdown {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  min-width: 200px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 20px 60px -20px rgba(var(--shadow-rgb), 0.55);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px) scale(0.96);
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: top right;
+  z-index: 200;
+}
+
+.theme-dropdown.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
+.theme-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-body, system-ui, sans-serif);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.theme-dropdown-item:hover {
+  background: var(--bg);
+  color: var(--text-primary);
+}
+
+.theme-dropdown-item.is-active {
+  color: var(--primary);
+  background: var(--bg);
+}
+
+.theme-dropdown-item .swatches {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.theme-dropdown-item .swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  display: block;
+  flex-shrink: 0;
+}
+
+.theme-dropdown-item .swatch:first-child {
+  border-radius: 50% 0 0 50%;
+}
+
+.theme-dropdown-item .swatch:last-child {
+  border-radius: 0 50% 50% 0;
+}
+
+.theme-dropdown-item .label {
+  flex: 1;
+}
+
+.theme-dropdown-item .check {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  color: var(--primary);
+}
+
+.theme-dropdown-item.is-active .check {
+  opacity: 1;
+}
+
+/* ---------- Адаптивность переключателя ---------- */
+@media (max-width: 760px) {
+  .theme-dropdown {
+    right: -8px;
+    min-width: 180px;
+  }
+  
+  .theme-toggle-btn {
+    width: 34px;
+    height: 34px;
+  }
+  
+  .theme-toggle-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .theme-dropdown {
+    right: -12px;
+    min-width: 160px;
+    padding: 6px;
+  }
+  
+  .theme-dropdown-item {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  
+  .theme-dropdown-item .swatch {
+    width: 14px;
+    height: 14px;
+  }
+}
