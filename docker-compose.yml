@@ -1,0 +1,100 @@
+name: satpaev
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TZ:-Asia/Almaty}
+    # настройки под небольшой сервер: мало памяти, быстрые индексы
+    command: >
+      postgres
+      -c shared_buffers=64MB
+      -c effective_cache_size=192MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=32MB
+      -c max_connections=30
+      -c wal_buffers=4MB
+      -c random_page_cost=1.1
+      -c checkpoint_completion_target=0.9
+      -c log_min_duration_statement=500
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    shm_size: 64m
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 300 1 --appendonly no --maxmemory 32mb --maxmemory-policy noeviction
+    volumes:
+      - ./data/redis:/data
+    mem_limit: 64m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *logging
+
+  bot:
+    build: ./bot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      BACKUP_DIR: /backups
+      SHARED_DIR: /shared
+    volumes:
+      - ./backups:/backups
+      - ./data/shared:/shared
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 256m
+    logging: *logging
+
+  poster:
+    build: ./poster
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: db
+      POSTER_SESSION: /session/poster
+    volumes:
+      - ./data/poster:/session
+      - ./data/shared:/shared:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 128m
+    logging: *logging
+
+  site:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "${SITE_PORT:-8080}:80"
+    volumes:
+      - ./site:/usr/share/nginx/html:ro
+      - ./site/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    mem_limit: 32m
+    logging: *logging
