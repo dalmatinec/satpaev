@@ -133,8 +133,7 @@ async def admin_menu(target, session: AsyncSession, cbd: Adm | None = None) -> N
         [btn("🛠 Услуги", Adm(s="cat", v="service")), btn("🖼 Портфолио", Adm(s="cat", v="portfolio"))],
         [btn("📢 Канал", Adm(s="ch")), btn("📨 Рассылка", Adm(s="bc"))],
         [btn("👤 Клиенты", Adm(s="cl")), btn("📊 Статистика", Adm(s="stat"))],
-        [btn("👥 Рефералы", Adm(s="ref")), btn(f"📝 Отзывы ({new_reviews})", Adm(s="rev"))],
-        [btn("💾 Бэкапы", Adm(s="bk")), btn("⚙️ Настройки", Adm(s="set"))],
+        [btn(f"📝 Отзывы ({new_reviews})", Adm(s="rev")), btn("🧩 Ещё", Adm(s="more"))],
         [btn("🏠 Клиентское меню", Nav(to="menu"))],
     ))
 
@@ -145,3 +144,20 @@ SCREENS["menu"] = admin_menu
 @router.callback_query(Adm.filter(F.s == "menu"))
 async def cb_menu(cb: CallbackQuery, session: AsyncSession) -> None:
     await admin_menu(cb, session)
+
+
+async def more_menu(target, session: AsyncSession, cbd: Adm | None = None) -> None:
+    await show(target, "🧩 <b>Ещё</b>\n\nОформление бота и редкие настройки.", kb(
+        [btn("✏️ Тексты", Adm(s="tx")), btn("🔘 Кнопки и меню", Adm(s="bt"))],
+        [btn("🖼 Картинки", Adm(s="img")), btn("⚙️ Настройки", Adm(s="set"))],
+        [btn("👥 Рефералы", Adm(s="ref")), btn("💾 Бэкапы", Adm(s="bk"))],
+        [btn("◀️ Админка", Adm(s="menu"))],
+    ))
+
+
+SCREENS["more"] = more_menu
+
+
+@router.callback_query(Adm.filter(F.s == "more"))
+async def cb_more(cb: CallbackQuery, session: AsyncSession) -> None:
+    await more_menu(cb, session)

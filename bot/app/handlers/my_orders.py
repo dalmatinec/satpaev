@@ -7,43 +7,49 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..cb import Adm, In, Nav, Shop
 from ..db.models import Order, Review, User
+from ..services import settings
 from ..services.orders import (
-    STATUSES,
     admin_card,
     client_card,
     client_order_kb,
-    kind_name,
+    kind_plain,
     notify_admins,
     set_status,
+    status_icon,
 )
 from ..states import ReviewSt
-from ..ui import back_menu, btn, kb, pager, show
+from ..ui import back_menu, btn, kb, mbtn, pager, show
 from ..utils import h, money
 
 router = Router(name="my_orders")
 PER_PAGE = 8
+t = settings.t
 
 
-@router.callback_query(Nav.filter(F.to == "orders"))
-async def nav_orders(cb: CallbackQuery, callback_data: Nav, session: AsyncSession, user: User) -> None:
+async def orders_view(target, session: AsyncSession, user: User, page: int) -> None:
     total = await session.scalar(select(func.count(Order.id)).where(Order.user_id == user.id)) or 0
     if total == 0:
-        await show(cb, "📦 У вас пока нет заказов.", kb(back_menu()))
+        await show(target, t("orders_empty"), kb(back_menu()))
         return
     pages = (total + PER_PAGE - 1) // PER_PAGE
-    page = max(0, min(callback_data.p, pages - 1))
+    page = max(0, min(page, pages - 1))
     orders = (await session.execute(
         select(Order).where(Order.user_id == user.id).order_by(Order.id.desc()).offset(page * PER_PAGE).limit(PER_PAGE)
     )).scalars().all()
     b = InlineKeyboardBuilder()
     for o in orders:
-        status_icon = STATUSES.get(o.status, "").split(" ")[0]
-        b.button(text=f"{status_icon} #{o.id} · {kind_name(o.kind)} · {money(o.amount) if o.amount else 'цена уточняется'}",
+        price = money(o.amount) if o.amount else "цена уточняется"
+        b.button(text=f"{status_icon(o.status)} #{o.id} · {kind_plain(o.kind)} · {price}",
                  callback_data=Shop(sec="ord", a="card", i=o.id))
     b.adjust(1)
     pager(b, page, pages, lambda p: Nav(to="orders", p=p))
     b.row(*back_menu())
-    await show(cb, f"📦 <b>Мои заказы</b> ({total})", b.as_markup())
+    await show(target, t("orders_list", total=total), b.as_markup())
+
+
+@router.callback_query(Nav.filter(F.to == "orders"))
+async def nav_orders(cb: CallbackQuery, callback_data: Nav, session: AsyncSession, user: User) -> None:
+    await orders_view(cb, session, user, callback_data.p)
 
 
 async def _own(session: AsyncSession, user: User, order_id: int) -> Order | None:
@@ -57,9 +63,13 @@ async def _own(session: AsyncSession, user: User, order_id: int) -> Order | None
 async def order_card(cb: CallbackQuery, callback_data: Shop, session: AsyncSession, user: User) -> None:
     order = await _own(session, user, callback_data.i)
     if not order:
-        await show(cb, "Заказ не найден.", kb(back_menu()))
+        await show(cb, t("order_not_found"), kb(back_menu()))
         return
     await show(cb, client_card(order), client_order_kb(order))
+
+
+def _admin_open(order: Order):
+    return kb([btn("📂 Открыть заказ", Adm(s="ord", a="card", i=order.id))])
 
 
 @router.callback_query(Shop.filter((F.sec == "ord") & (F.a == "paid")))
@@ -69,13 +79,8 @@ async def order_paid(cb: CallbackQuery, callback_data: Shop, session: AsyncSessi
         await order_card(cb, callback_data, session, user)
         return
     await set_status(session, cb.bot, order, "paid", notify=False)
-    await notify_admins(
-        cb.bot,
-        "💰 <b>Клиент отметил оплату</b>\n\n" + admin_card(order, user),
-        kb([btn("📂 Открыть заказ", Adm(s="ord", a="card", i=order.id))]),
-    )
-    await show(cb, "✅ Спасибо! Менеджер проверит оплату и возьмёт заказ в работу.\n\n" + client_card(order),
-               client_order_kb(order))
+    await notify_admins(cb.bot, "💰 <b>Клиент отметил оплату</b>\n\n" + admin_card(order, user), _admin_open(order))
+    await show(cb, t("paid_thanks", card=client_card(order)), client_order_kb(order))
 
 
 @router.callback_query(Shop.filter((F.sec == "ord") & (F.a.in_({"agree", "decline"}))))
@@ -88,16 +93,13 @@ async def order_quote(cb: CallbackQuery, callback_data: Shop, session: AsyncSess
     if callback_data.a == "agree":
         await set_status(session, cb.bot, order, "wait_pay", notify=False)
         note = "✅ Клиент согласился с ценой"
-        from ..services import settings
-
-        reply = "👍 Отлично! " + h(settings.rich("pay_info").text)
+        reply = t("quote_agree", pay=t("pay_info"), card=client_card(order))
     else:
         await set_status(session, cb.bot, order, "canceled", notify=False)
         note = "✖️ Клиент отказался от цены"
-        reply = "Заказ отменён. Если передумаете, просто оформите заново."
-    await notify_admins(cb.bot, f"{note}\n\n" + admin_card(order, user),
-                        kb([btn("📂 Открыть заказ", Adm(s="ord", a="card", i=order.id))]))
-    await show(cb, reply + "\n\n" + client_card(order), client_order_kb(order))
+        reply = t("quote_decline", card=client_card(order))
+    await notify_admins(cb.bot, f"{note}\n\n" + admin_card(order, user), _admin_open(order))
+    await show(cb, reply, client_order_kb(order))
 
 
 # ---------- Отзыв после заказа ----------
@@ -106,17 +108,15 @@ async def order_quote(cb: CallbackQuery, callback_data: Shop, session: AsyncSess
 async def review_rate(cb: CallbackQuery, callback_data: Shop, session: AsyncSession, user: User, state: FSMContext) -> None:
     order = await _own(session, user, callback_data.i)
     if not order or order.status != "done":
-        await show(cb, "Отзыв можно оставить после выполнения заказа.", kb(back_menu()))
+        await show(cb, t("review_only_done"), kb(back_menu()))
         return
-    exists = await session.scalar(select(Review.id).where(Review.order_id == order.id))
-    if exists:
-        await show(cb, "Вы уже оставили отзыв на этот заказ, спасибо! 💛", kb(back_menu()))
+    if await session.scalar(select(Review.id).where(Review.order_id == order.id)):
+        await show(cb, t("review_exists"), kb(back_menu()))
         return
     rating = max(1, min(5, int(callback_data.v or 5)))
     await state.set_state(ReviewSt.text)
     await state.update_data(order_id=order.id, rating=rating)
-    await show(cb, f"{'⭐' * rating}\n\nНапишите пару слов о заказе или нажмите «Без текста».",
-               kb([btn("➡️ Без текста", In(a="rev_skip"))]))
+    await show(cb, t("review_text_ask", stars="⭐" * rating), kb([mbtn("no_text", In(a="rev_skip"))]))
 
 
 async def _save_review(target, state: FSMContext, session: AsyncSession, user: User, text: str) -> None:
@@ -124,7 +124,7 @@ async def _save_review(target, state: FSMContext, session: AsyncSession, user: U
     await state.clear()
     order_id = int(data.get("order_id") or 0)
     if not order_id or await session.scalar(select(Review.id).where(Review.order_id == order_id)):
-        await show(target, "Спасибо! 💛", kb(back_menu()))
+        await show(target, t("review_thanks"), kb(back_menu()))
         return
     review = Review(order_id=order_id, user_id=user.id, rating=int(data.get("rating") or 5), text=text[:1000])
     session.add(review)
@@ -136,7 +136,7 @@ async def _save_review(target, state: FSMContext, session: AsyncSession, user: U
         kb([btn("📢 Опубликовать", Adm(s="rev", a="pub", i=review.id)),
             btn("🙈 Скрыть", Adm(s="rev", a="hide", i=review.id))]),
     )
-    await show(target, "💛 Спасибо за отзыв! Нам очень важно ваше мнение.", kb(back_menu()))
+    await show(target, t("review_thanks"), kb(back_menu()))
 
 
 @router.callback_query(ReviewSt.text, In.filter(F.a == "rev_skip"))
@@ -151,24 +151,19 @@ async def review_text(message: Message, state: FSMContext, session: AsyncSession
 
 @router.callback_query(Nav.filter(F.to == "reviews"))
 async def nav_reviews(cb: CallbackQuery, session: AsyncSession) -> None:
-    from ..services import settings
-
-    stats = (await session.execute(
+    count, avg = (await session.execute(
         select(func.count(Review.id), func.avg(Review.rating)).where(Review.status == "published")
     )).one()
     last = (await session.execute(
         select(Review).where(Review.status == "published", Review.text != "").order_by(Review.id.desc()).limit(5)
     )).scalars().all()
-    text = "⭐ <b>Отзывы клиентов</b>\n\n"
-    if stats[0]:
-        text += f"Средняя оценка: <b>{float(stats[1]):.1f}</b> из 5 · отзывов: <b>{stats[0]}</b>\n\n"
-    for r in last:
-        text += f"{'⭐' * r.rating}\n«{h(r.text[:300])}»\n\n"
-    if not stats[0]:
-        text += "Отзывов пока нет, ваш может стать первым!"
+    stats = t("reviews_stats", avg=f"{float(avg):.1f}", count=count) if count else ""
+    items = "".join(f"{'⭐' * r.rating}\n«{h(r.text[:300])}»\n\n" for r in last)
+    if not count:
+        items = t("reviews_empty")
     rows = []
     link = str(settings.get("reviews_link") or "")
     if link.startswith("http"):
-        rows.append([btn("📢 Все отзывы в канале", url=link)])
+        rows.append([mbtn("reviews_channel", url=link)])
     rows.append(back_menu())
-    await show(cb, text.strip(), kb(*rows))
+    await show(cb, t("reviews_screen", stats=stats, list=items).strip(), kb(*rows))

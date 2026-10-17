@@ -5,7 +5,8 @@ from ..cb import Shop
 from ..config import config
 from ..db.models import Order, Review, User
 from ..ui import btn, kb, send_safe
-from .orders import kind_name
+from . import settings
+from .orders import kind_plain
 
 
 async def ask_review(bot: Bot, order: Order) -> None:
@@ -13,7 +14,7 @@ async def ask_review(bot: Bot, order: Order) -> None:
     await send_safe(
         bot,
         order.user_id,
-        f"🙏 Оцените, пожалуйста, заказ <b>#{order.id}</b>. Это займёт пару секунд и очень нам поможет.",
+        settings.t("review_ask", id=order.id),
         kb(stars[4:5], stars[3:4], stars[:3]),
     )
 
@@ -32,7 +33,7 @@ def review_post(review: Review, user: User | None, order: Order | None) -> tuple
         parts += [Italic(f"«{review.text.strip()}»"), "\n\n"]
     parts += ["👤 ", mask_name(user)]
     if order:
-        parts += ["\n📦 ", kind_name(order.kind)]
+        parts += ["\n📦 ", kind_plain(order.kind)]
     text, ents = Text(*parts).render()
     return text, [e.model_dump(exclude_none=True) for e in ents]
 

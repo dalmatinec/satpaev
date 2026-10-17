@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...cb import Adm
 from ...db.models import Order, RefAccrual, SupportLink, User
-from ...services.orders import STATUSES, TAGS, kind_name, tag_name
+from ...services.orders import TAGS, kind_plain, status_icon, tag_name
 from ...states import AdmSt
 from ...ui import btn, kb, pager, show
 from ...utils import clean_username, fdate, h, money
@@ -111,8 +111,8 @@ async def user_orders(target, session: AsyncSession, user_id: int, page: int) ->
     )).scalars().all()
     b = InlineKeyboardBuilder()
     for o in orders:
-        icon = STATUSES.get(o.status, "").split(" ")[0]
-        b.row(btn(f"{icon} #{o.id} · {kind_name(o.kind)} · {money(o.amount) if o.amount else 'без цены'}",
+        icon = status_icon(o.status)
+        b.row(btn(f"{icon} #{o.id} · {kind_plain(o.kind)} · {money(o.amount) if o.amount else 'без цены'}",
                   Adm(s="ord", a="card", i=o.id)))
     pager(b, page, pages, lambda p: Adm(s="cl", a="orders", i=user_id, p=p))
     b.row(btn("◀️ Клиент", Adm(s="cl", a="card", i=user_id)))

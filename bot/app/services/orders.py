@@ -9,47 +9,37 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..cb import Adm, Nav, Shop
 from ..config import config
 from ..db.models import Item, Order, RefAccrual, Reminder, User
-from ..ui import btn, kb, send_safe
+from ..texts import strip_html
+from ..ui import btn, kb, mbtn, send_safe
 from ..utils import fdate, h, money, utcnow
 from . import settings, workhours
 
 log = logging.getLogger(__name__)
 
-KINDS = {
-    "stars": "⭐ Звёзды",
-    "gift": "🎁 NFT подарок",
-    "uname_ready": "💎 Юзернейм",
-    "uname_custom": "💎 Юзер под заказ",
-    "exchange": "💱 Обмен",
-    "dev": "🛠 Разработка",
-}
-
-STATUSES = {
-    "new": "🆕 Новый",
-    "quote": "💵 Ждёт согласия с ценой",
-    "wait_pay": "💳 Ждёт оплаты",
-    "paid": "💰 Клиент оплатил",
-    "work": "⚙️ В работе",
-    "done": "✅ Выполнен",
-    "canceled": "❌ Отменён",
-}
-
+KIND_KEYS = ("stars", "gift", "uname_ready", "uname_custom", "exchange", "dev")
+STATUS_KEYS = ("new", "quote", "wait_pay", "paid", "work", "done", "canceled")
 ACTIVE = ("new", "quote", "wait_pay", "paid", "work")
-
-STAGES = [
-    ("reserved", "🔒 Юзер занят"),
-    ("auction", "🔨 Выставлен на аукцион"),
-    ("transferred", "📤 Передан вам"),
-]
-STAGE_NAMES = dict(STAGES)
+STAGE_KEYS = ("reserved", "auction", "transferred")
 
 
 def kind_name(kind: str) -> str:
-    return KINDS.get(kind, kind)
+    return settings.t(f"kind_{kind}") if kind in KIND_KEYS else kind
 
 
 def status_name(status: str) -> str:
-    return STATUSES.get(status, status)
+    return settings.t(f"st_{status}") if status in STATUS_KEYS else status
+
+
+def stage_name(stage: str) -> str:
+    return settings.t(f"stage_{stage}") if stage in STAGE_KEYS else stage
+
+
+def kind_plain(kind: str) -> str:
+    return strip_html(kind_name(kind))
+
+
+def status_icon(status: str) -> str:
+    return strip_html(status_name(status)).split(" ")[0]
 
 
 def _lines(order: Order) -> str:
@@ -63,7 +53,8 @@ def timeline(order: Order) -> str:
     stages = (order.details or {}).get("stages") or {}
     out = ["", "<b>Ход заказа</b>", "✅ Заявка принята"]
     passed = True
-    for key, name in STAGES:
+    for key in STAGE_KEYS:
+        name = stage_name(key)
         if key in stages:
             out.append(f"✅ {name} <i>({fdate_iso(stages[key])})</i>")
         elif passed and order.status not in ("done", "canceled"):
@@ -91,9 +82,9 @@ def client_card(order: Order) -> str:
         _lines(order),
     ]
     if order.amount is not None:
-        parts.append(f"\nСумма: <b>{money(order.amount)}</b>")
+        parts.append("\n" + settings.t("order_amount", amount=money(order.amount)))
     elif order.status == "new":
-        parts.append("\n💬 Менеджер рассчитает стоимость и пришлёт предложение сюда.")
+        parts.append("\n" + settings.t("order_wait_price"))
     parts.append(timeline(order))
     return "\n".join(p for p in parts if p is not None)
 
@@ -117,7 +108,7 @@ def admin_card(order: Order, user: User | None) -> str:
     if order.cost is not None:
         parts.append(f"Себестоимость: {money(order.cost)} · Прибыль: <b>{money(order.profit)}</b>")
     if order.stage:
-        parts.append(f"Этап: {STAGE_NAMES.get(order.stage, order.stage)}")
+        parts.append(f"Этап: {stage_name(order.stage)}")
     note = (order.details or {}).get("admin_note")
     if note:
         parts.append(f"📝 {h(note)}")
@@ -157,14 +148,14 @@ def admin_order_kb(order: Order):
 def client_order_kb(order: Order):
     rows = []
     if order.status == "wait_pay":
-        rows.append([btn("✅ Я оплатил", Shop(sec="ord", a="paid", i=order.id))])
+        rows.append([mbtn("paid", Shop(sec="ord", a="paid", i=order.id))])
     if order.status == "quote":
         rows.append([
-            btn("✅ Согласен", Shop(sec="ord", a="agree", i=order.id)),
-            btn("✖️ Отказаться", Shop(sec="ord", a="decline", i=order.id)),
+            mbtn("agree", Shop(sec="ord", a="agree", i=order.id)),
+            mbtn("decline", Shop(sec="ord", a="decline", i=order.id)),
         ])
-    rows.append([btn("💬 Написать менеджеру", Nav(to="support"))])
-    rows.append([btn("📦 Мои заказы", Nav(to="orders")), btn("🏠 Меню", Nav(to="menu"))])
+    rows.append([mbtn("write_manager", Nav(to="support"))])
+    rows.append([mbtn("my_orders", Nav(to="orders")), mbtn("home_short", Nav(to="menu"))])
     return kb(*rows)
 
 
@@ -205,22 +196,20 @@ async def create_order(
 
 
 def created_text(order: Order) -> str:
-    text = "✅ <b>Заказ оформлен!</b>\n\n" + client_card(order)
+    text = settings.t("order_created", card=client_card(order))
     if order.status == "wait_pay":
-        pay = settings.rich("pay_info").text
-        text += f"\n\n{h(pay)}"
+        text += "\n\n" + settings.t("pay_info")
     if not workhours.is_working():
-        text += f"\n\n🌙 Сейчас нерабочее время, обработаем с <b>{h(settings.get('work_from'))}</b>."
+        text += "\n\n" + settings.t("after_hours_note", time=h(settings.get("work_from")))
     return text
 
 
+def open_kb(order: Order):
+    return kb([mbtn("open_order", Shop(sec="ord", a="card", i=order.id))])
+
+
 async def notify_client(bot: Bot, order: Order, text: str) -> None:
-    await send_safe(
-        bot,
-        order.user_id,
-        f"📦 <b>Заказ #{order.id}</b> · {kind_name(order.kind)}\n{text}",
-        kb([btn("📂 Открыть заказ", Shop(sec="ord", a="card", i=order.id))]),
-    )
+    await send_safe(bot, order.user_id, text, open_kb(order))
 
 
 async def set_status(session: AsyncSession, bot: Bot, order: Order, status: str, notify: bool = True) -> None:
@@ -228,7 +217,8 @@ async def set_status(session: AsyncSession, bot: Bot, order: Order, status: str,
     order.updated_at = utcnow()
     await session.commit()
     if notify:
-        await notify_client(bot, order, f"Статус: <b>{status_name(status)}</b>")
+        await notify_client(bot, order, settings.t(
+            "order_status", id=order.id, kind=kind_name(order.kind), status=status_name(status)))
 
 
 async def set_stage(session: AsyncSession, bot: Bot, order: Order, stage: str) -> None:
@@ -251,7 +241,8 @@ async def set_stage(session: AsyncSession, bot: Bot, order: Order, stage: str) -
         session.add(Reminder(order_id=order.id, due_at=now + timedelta(days=days),
                              text=f"⏰ Аукцион @{uname} (заказ #{order.id}) завершается, проверь ставки"))
     await session.commit()
-    await notify_client(bot, order, f"{STAGE_NAMES.get(stage, stage)}\n{timeline(order)}")
+    await notify_client(bot, order, settings.t(
+        "order_stage", id=order.id, kind=kind_name(order.kind), stage=stage_name(stage), timeline=timeline(order)))
 
 
 async def finalize(session: AsyncSession, bot: Bot, order: Order, cost: Decimal | None) -> None:
@@ -273,13 +264,13 @@ async def finalize(session: AsyncSession, bot: Bot, order: Order, cost: Decimal 
 
     from .reviews import ask_review  # локальный импорт, чтобы не было цикла
 
-    await notify_client(bot, order, "✅ <b>Заказ выполнен!</b> Спасибо, что выбрали нас.")
+    await notify_client(bot, order, settings.t("order_done", id=order.id, kind=kind_name(order.kind)))
     await ask_review(bot, order)
     if accrual and user:
         await send_safe(
             bot,
             accrual.referrer_id,
-            f"💸 Начислено <b>{money(accrual.amount)}</b> за заказ вашего друга. Выплата через менеджера.",
+            settings.t("ref_accrued", amount=money(accrual.amount)),
         )
 
 

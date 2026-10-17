@@ -1,0 +1,20 @@
+# Пока домена нет, сайт работает по IP на 80 порту.
+# Когда появится домен, впишите его в .env (SITE_ADDRESS=example.kz) и перезапустите:
+# Caddy сам получит и будет продлевать SSL сертификат.
+{$SITE_ADDRESS::80} {
+	root * /srv
+	encode zstd gzip
+	file_server
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+
+	@static path *.css *.js *.svg *.png *.jpg *.webp *.woff2
+	header @static Cache-Control "public, max-age=604800"
+
+}

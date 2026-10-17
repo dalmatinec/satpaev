@@ -16,11 +16,13 @@ from aiogram.types import (
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from .cb import Nav
+from .texts import fill
 from .utils import Rich
 
 log = logging.getLogger(__name__)
 
 Content = str | Rich
+CAPTION_LIMIT = 1024
 
 
 def _text_kwargs(content: Content) -> dict:
@@ -31,13 +33,31 @@ def _text_kwargs(content: Content) -> dict:
 
 def _caption_kwargs(content: Content) -> dict:
     if isinstance(content, Rich):
-        return {"caption": content.text[:1024], "caption_entities": content.entities, "parse_mode": None}
+        return {"caption": content.text[:CAPTION_LIMIT], "caption_entities": content.entities, "parse_mode": None}
     return {"caption": content}
+
+
+def _too_long_for_caption(content: Content) -> bool:
+    text = content.text if isinstance(content, Rich) else content
+    return len(text) > CAPTION_LIMIT
+
+
+def plain_kb(markup: InlineKeyboardMarkup | None) -> InlineKeyboardMarkup | None:
+    """Та же клавиатура без премиум иконок и цветов (если Telegram их не принял)."""
+    if markup is None:
+        return None
+    rows = [[b.model_copy(update={"icon_custom_emoji_id": None, "style": None}) for b in row]
+            for row in markup.inline_keyboard]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def _has_extras(markup: InlineKeyboardMarkup | None) -> bool:
+    return bool(markup and any(b.icon_custom_emoji_id or b.style for row in markup.inline_keyboard for b in row))
 
 
 async def answer(cb: CallbackQuery, text: str | None = None, alert: bool = False) -> None:
     with suppress(TelegramBadRequest):
-        await cb.answer(text, show_alert=alert)
+        await cb.answer(text[:200] if text else text, show_alert=alert)
 
 
 async def show(
@@ -46,7 +66,19 @@ async def show(
     kb: InlineKeyboardMarkup | None = None,
     photo: str | None = None,
 ) -> Message | None:
+    try:
+        return await _show(target, content, kb, photo)
+    except TelegramBadRequest as e:
+        if _has_extras(kb):
+            log.info("клавиатура с иконками не принята (%s), показываю без них", e)
+            return await _show(target, content, plain_kb(kb), photo)
+        raise
+
+
+async def _show(target, content: Content, kb, photo: str | None) -> Message | None:
     """Показать экран: отредактировать текущее сообщение или прислать новое."""
+    if photo and _too_long_for_caption(content):
+        photo = None  # подпись к фото ограничена 1024 символами
     bot: Bot = target.bot
     if isinstance(target, CallbackQuery):
         await answer(target)
@@ -63,36 +95,45 @@ async def show(
             except TelegramBadRequest as e:
                 if "not modified" in str(e):
                     return msg
+                if _has_extras(kb):
+                    raise
                 log.debug("edit failed: %s", e)
             with suppress(TelegramBadRequest):
                 await msg.delete()
     else:
         chat_id = target.chat.id
+    if photo:
+        try:
+            return await bot.send_photo(chat_id, photo, **_caption_kwargs(content), reply_markup=kb)
+        except TelegramBadRequest as e:
+            if _has_extras(kb):
+                raise
+            log.info("photo failed, sending text: %s", e)
     try:
-        if photo:
-            try:
-                return await bot.send_photo(chat_id, photo, **_caption_kwargs(content), reply_markup=kb)
-            except TelegramBadRequest:
-                pass  # файл недоступен, показываем текстом
         return await bot.send_message(chat_id, **_text_kwargs(content), reply_markup=kb)
-    except TelegramBadRequest as e:
+    except TelegramBadRequest:
         if isinstance(content, Rich) and content.entities:
-            # если премиум эмодзи недоступны (кончился Premium), шлём без них
             safe = Rich(content.text, [x for x in content.entities if x.type != "custom_emoji"] or None)
             return await bot.send_message(chat_id, **_text_kwargs(safe), reply_markup=kb)
-        raise e
+        raise
 
 
 async def send_safe(bot: Bot, chat_id: int, content: Content, kb: InlineKeyboardMarkup | None = None) -> Message | None:
     """Отправка уведомления без падений (клиент мог заблокировать бота)."""
-    try:
-        return await bot.send_message(chat_id, **_text_kwargs(content), reply_markup=kb)
-    except TelegramRetryAfter as e:
-        await asyncio.sleep(e.retry_after + 1)
-        with suppress(TelegramBadRequest, TelegramForbiddenError):
+    for attempt in range(3):
+        try:
             return await bot.send_message(chat_id, **_text_kwargs(content), reply_markup=kb)
-    except (TelegramBadRequest, TelegramForbiddenError) as e:
-        log.info("send to %s failed: %s", chat_id, e)
+        except TelegramRetryAfter as e:
+            await asyncio.sleep(e.retry_after + 1)
+        except TelegramBadRequest as e:
+            if _has_extras(kb):
+                kb = plain_kb(kb)
+                continue
+            log.info("send to %s failed: %s", chat_id, e)
+            return None
+        except TelegramForbiddenError as e:
+            log.info("send to %s failed: %s", chat_id, e)
+            return None
     return None
 
 
@@ -100,15 +141,28 @@ def kb(*rows: list[InlineKeyboardButton]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[list(r) for r in rows if r])
 
 
-def btn(text: str, cb=None, url: str | None = None) -> InlineKeyboardButton:
+def btn(text: str, cb=None, url: str | None = None, icon: str | None = None, style: str | None = None) -> InlineKeyboardButton:
+    extra = {}
+    if icon:
+        extra["icon_custom_emoji_id"] = icon
+    if style:
+        extra["style"] = style
     if url:
-        return InlineKeyboardButton(text=text, url=url)
+        return InlineKeyboardButton(text=text, url=url, **extra)
     data = cb.pack() if hasattr(cb, "pack") else str(cb)
-    return InlineKeyboardButton(text=text, callback_data=data)
+    return InlineKeyboardButton(text=text, callback_data=data, **extra)
+
+
+def mbtn(key: str, cb=None, url: str | None = None, **values) -> InlineKeyboardButton:
+    """Кнопка из реестра: текст, премиум иконка и цвет настраиваются в админке."""
+    from .services import settings
+
+    spec = settings.button(key)
+    return btn(fill(spec["text"], values)[:64], cb, url=url, icon=spec["icon"] or None, style=spec["style"] or None)
 
 
 def back_menu() -> list[InlineKeyboardButton]:
-    return [btn("🏠 Главное меню", Nav(to="menu"))]
+    return [mbtn("home", Nav(to="menu"))]
 
 
 def pager(builder: InlineKeyboardBuilder, page: int, total_pages: int, make_cb) -> None:

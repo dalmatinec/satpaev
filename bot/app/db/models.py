@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     SmallInteger,
     String,
@@ -234,3 +235,14 @@ class PosterStatus(Base):
     state: Mapped[str] = mapped_column(String(32), default="", server_default=EMPTY)
     info: Mapped[str] = mapped_column(String(256), default="", server_default=EMPTY)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Media(Base):
+    """Картинки разделов. Сам файл хранится в базе, поэтому попадает в бэкап."""
+
+    __tablename__ = "media"
+
+    key: Mapped[str] = mapped_column(String(32), primary_key=True)
+    file_id: Mapped[str] = mapped_column(String(256), default="", server_default=EMPTY)
+    data: Mapped[bytes | None] = mapped_column(LargeBinary)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

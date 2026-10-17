@@ -1,6 +1,6 @@
 from aiogram import Router
 
-from . import broadcast, catalog, channel, clients, common, misc, orders, rates, stats
+from . import broadcast, catalog, channel, clients, common, custom, misc, orders, rates, stats
 from .common import IsAdmin
 
 
@@ -18,5 +18,6 @@ def build_router() -> Router:
         clients.router,
         stats.router,
         misc.router,
+        custom.router,
     )
     return router

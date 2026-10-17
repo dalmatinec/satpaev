@@ -13,7 +13,7 @@ from .config import config
 from .db import init_db
 from .handlers import build_routers
 from .middlewares import AppMiddleware, ResetStateMiddleware
-from .services import scheduler, settings, username_check
+from .services import media, scheduler, settings, username_check
 
 log = logging.getLogger("bot")
 
@@ -47,6 +47,7 @@ async def main() -> None:
 
     engine, sm = await init_db()
     await settings.load(sm)
+    await media.load(sm)
 
     bot = Bot(config.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML, link_preview_is_disabled=True))
     dp = Dispatcher(storage=_storage())
@@ -57,6 +58,7 @@ async def main() -> None:
     dp.errors.register(on_error)
 
     await bot.set_my_commands([BotCommand(command="start", description="Главное меню")])
+    await media.verify(bot, sm)
     tick = asyncio.create_task(scheduler.run(bot, sm))
     me = await bot.me()
     log.info("Бот @%s запущен", me.username)

@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Satpaev: звёзды, NFT подарки и юзернеймы Telegram</title>
+  <meta name="description" content="Звёзды Telegram оптом, NFT подарки, коллекционные юзернеймы через Fragment, обмен и разработка ботов. Заказ в Telegram боте.">
+  <meta name="theme-color" content="#0f0b1f">
+  <meta property="og:title" content="Satpaev: звёзды, NFT подарки и юзернеймы Telegram">
+  <meta property="og:description" content="Звёзды оптом, NFT подарки, юзернеймы под заказ, обмен и разработка ботов.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- фон: звёзды на канвасе и плавающее сияние -->
+  <canvas class="sky" aria-hidden="true"></canvas>
+  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="cursor-glow" aria-hidden="true"></div>
+  <div class="progress" aria-hidden="true"></div>
+
+  <header class="nav glass">
+    <a class="logo" href="#top" aria-label="На главную"><span class="logo-at">@</span><span data-brand>Satpaev</span></a>
+    <nav class="nav-links" aria-label="Разделы">
+      <a href="#services">Услуги</a>
+      <a href="#calc">Звёзды</a>
+      <a href="#check">Юзернеймы</a>
+      <a href="#dev">Разработка</a>
+      <a href="#faq">Вопросы</a>
+    </nav>
+    <a class="btn btn-gold btn-sm magnetic" data-bot href="#">Открыть бота</a>
+  </header>
+
+  <main id="top">
+    <!-- ===== главный экран ===== -->
+    <section class="hero">
+      <div class="hero-copy reveal">
+        <p class="pill glass"><span class="dot"></span>Коллекционные юзернеймы, звёзды и NFT подарки</p>
+        <h1 class="handle" aria-label="Юзернейм">
+          <span class="handle-at">@</span><span class="handle-name" data-scramble>satpaev</span>
+        </h1>
+        <p class="hero-text">Займём нужный вам юзер, проведём через аукцион Fragment и передадим как NFT.
+          Звёзды оптом, подарки, обмен и разработка ботов. Всё в одном Telegram боте.</p>
+        <div class="hero-actions">
+          <a class="btn btn-gold magnetic" data-bot href="#">Заказать в боте</a>
+          <a class="btn btn-glass magnetic" href="#check">Проверить юзер</a>
+        </div>
+      </div>
+
+      <div class="hero-stage" aria-hidden="true">
+        <div class="orb orb-1"><span>🎁</span></div>
+        <div class="orb orb-2"><span>⭐</span></div>
+        <div class="orb orb-3"><span>💎</span></div>
+        <article class="lot glass tilt">
+          <div class="lot-shine"></div>
+          <header class="lot-head">
+            <span class="lot-label">Лот Fragment</span>
+            <span class="lot-status" data-lot-status>Передан клиенту</span>
+          </header>
+          <p class="lot-name">@<span data-lot-name>satpaev</span></p>
+          <div class="lot-row">
+            <div>
+              <span class="lot-k">Цена</span>
+              <span class="lot-ton"><span data-lot-ton>120</span> TON</span>
+            </div>
+            <div>
+              <span class="lot-k">До конца аукциона</span>
+              <span class="lot-timer" data-timer>6д 23:59:59</span>
+            </div>
+          </div>
+          <div class="lot-bar"><i data-lot-bar></i></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== бегущая строка ===== -->
+    <div class="ticker glass" aria-hidden="true"><div class="ticker-track" data-ticker></div></div>
+
+    <!-- ===== услуги ===== -->
+    <section id="services" class="section">
+      <h2 class="title reveal">Что можно заказать</h2>
+      <div class="bento">
+        <a class="tile glass spot tilt reveal tile-wide" data-bot-start="stars" href="#">
+          <span class="tile-emoji">⭐</span>
+          <h3>Звёзды Telegram</h3>
+          <p>На любой аккаунт, от 50 штук. Чем больше объём, тем дешевле звезда. Выдача до 3 часов.</p>
+          <span class="tile-go">Купить звёзды</span>
+        </a>
+        <a class="tile glass spot tilt reveal" data-bot-start="gifts" href="#">
+          <span class="tile-emoji">🎁</span>
+          <h3>NFT подарки</h3>
+          <p>Витрина с фото и ценой. Ищете редкую модель или фон? Подберём.</p>
+          <span class="tile-go">Смотреть витрину</span>
+        </a>
+        <a class="tile glass spot tilt reveal" data-bot-start="un" href="#">
+          <span class="tile-emoji">💎</span>
+          <h3>Юзернеймы</h3>
+          <p>Готовые красивые юзеры и поиск под заказ с передачей через Fragment.</p>
+          <span class="tile-go">Выбрать юзер</span>
+        </a>
+        <a class="tile glass spot tilt reveal" data-bot-start="ex" href="#">
+          <span class="tile-emoji">💱</span>
+          <h3>Обмен</h3>
+          <p>Курс на день фиксирован, сделка от 5 до 30 минут.</p>
+          <span class="tile-go">Узнать курс</span>
+        </a>
+        <a class="tile glass spot tilt reveal" data-bot-start="dev" href="#">
+          <span class="tile-emoji">🛠</span>
+          <h3>Боты и сайты</h3>
+          <p>Разработка под ключ, деплой на сервер, домен и SSL, поддержка.</p>
+          <span class="tile-go">Оставить заявку</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- ===== калькулятор звёзд ===== -->
+    <section id="calc" class="section">
+      <div class="calc glass reveal">
+        <div class="calc-copy">
+          <h2 class="title">Калькулятор звёзд</h2>
+          <p class="muted">Двигайте ползунок: цена одной звезды падает с объёмом. Нажмите «Купить», бот откроется уже с этим количеством.</p>
+          <ul class="tiers" data-tiers></ul>
+        </div>
+        <div class="calc-box">
+          <label class="calc-label" for="qty">Количество звёзд</label>
+          <div class="calc-qty">
+            <input id="qty" class="calc-input" type="number" inputmode="numeric" min="50" max="100000" step="10" value="500">
+            <span>⭐</span>
+          </div>
+          <input class="range" type="range" min="0" max="1000" value="300" aria-label="Количество звёзд" data-range>
+          <div class="chips" data-chips></div>
+          <div class="calc-total">
+            <div><span class="lot-k">Цена звезды</span><b data-unit>9 ₸</b></div>
+            <div><span class="lot-k">Итого</span><b class="calc-sum" data-sum>4 500 ₸</b></div>
+          </div>
+          <a class="btn btn-gold btn-wide magnetic" data-buy-stars href="#">Купить в боте</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== проверка юзернейма ===== -->
+    <section id="check" class="section">
+      <div class="check glass reveal">
+        <h2 class="title">Хотите конкретный юзер?</h2>
+        <p class="muted">Введите юзернейм: проверим формат, а бот посмотрит его статус на Fragment и примет заявку.</p>
+        <form class="check-form" data-check novalidate>
+          <span class="check-at">@</span>
+          <input class="check-input" name="u" placeholder="username" autocomplete="off" spellcheck="false" maxlength="32" aria-label="Юзернейм">
+          <button class="btn btn-gold magnetic" type="submit">Заказать</button>
+        </form>
+        <p class="check-hint" data-check-hint>Латиница, цифры и «_», от 4 до 32 символов.</p>
+        <div class="check-links">
+          <a class="link" data-fragment href="https://fragment.com/" target="_blank" rel="noopener">Открыть на Fragment</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== как проходит заказ юзера ===== -->
+    <section class="section">
+      <h2 class="title reveal">Как проходит заказ юзернейма</h2>
+      <ol class="steps" data-steps>
+        <li class="step glass reveal"><h3>Заявка</h3><p>Пишете в бота, какой юзер хотите. Бот проверит его на Fragment, менеджер назовёт цену.</p></li>
+        <li class="step glass reveal"><h3>Юзер занят</h3><p>После оплаты закрепляем юзер за нами, чтобы его никто не забрал.</p></li>
+        <li class="step glass reveal"><h3>Аукцион</h3><p>Через неделю выставляем на аукцион Fragment и сопровождаем ставки.</p></li>
+        <li class="step glass reveal"><h3>Передача</h3><p>Юзер приходит к вам коллекционным NFT. Каждый этап видно в боте.</p></li>
+      </ol>
+    </section>
+
+    <!-- ===== разработка ===== -->
+    <section id="dev" class="section dev">
+      <div class="dev-copy reveal">
+        <h2 class="title">Боты, сайты и сервера под ключ</h2>
+        <p class="muted">Пишу Telegram ботов, сайты и Mini App. Разворачиваю на сервере, настраиваю домен, SSL, Docker
+          и базы данных, ставлю бэкапы и слежу, чтобы всё работало.</p>
+        <ul class="dev-list">
+          <li><b>Telegram боты</b><span>магазины, обменники, CRM, рассылки</span></li>
+          <li><b>Сайты и лендинги</b><span>от дизайна до запуска на домене</span></li>
+          <li><b>Mini App</b><span>витрины и кабинеты внутри Telegram</span></li>
+          <li><b>Сервер под ключ</b><span>VPS, Docker, PostgreSQL, SSL, бэкапы</span></li>
+        </ul>
+        <a class="btn btn-glass magnetic" data-bot-start="dev" href="#">Обсудить проект</a>
+      </div>
+      <div class="term glass reveal" aria-label="Пример деплоя">
+        <div class="term-bar"><i></i><i></i><i></i><span>deploy</span></div>
+        <pre class="term-body" data-term></pre>
+      </div>
+    </section>
+
+    <!-- ===== вопросы ===== -->
+    <section id="faq" class="section">
+      <h2 class="title reveal">Частые вопросы</h2>
+      <div class="faq">
+        <details class="glass reveal"><summary>Как оплатить заказ?</summary>
+          <p>Оформляете заказ в боте, менеджер присылает реквизиты прямо в чат. После оплаты нажимаете «Я оплатил», и заказ уходит в работу.</p></details>
+        <details class="glass reveal"><summary>Сколько ждать звёзды?</summary>
+          <p>Обычно быстрее, но мы обещаем не дольше 3 часов с момента оплаты.</p></details>
+        <details class="glass reveal"><summary>Что если юзер, который я хочу, уже занят?</summary>
+          <p>Бот покажет его статус на Fragment. Если юзер продаётся или на аукционе, поможем купить. Если занят, предложим похожие варианты.</p></details>
+        <details class="glass reveal"><summary>Можно ли следить за заказом?</summary>
+          <p>Да, в разделе «Мои заказы» видно статус и каждый этап, а бот присылает уведомления.</p></details>
+        <details class="glass reveal"><summary>Есть реферальная программа?</summary>
+          <p>Да. Приглашайте друзей по своей ссылке из бота и получайте процент с их заказов.</p></details>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="cta glass reveal">
+        <h2 class="title">Всё оформляется в боте</h2>
+        <p class="muted">Выберите услугу, бот посчитает цену и передаст заказ менеджеру.</p>
+        <a class="btn btn-gold magnetic" data-bot href="#">Открыть бота</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>© <span data-year>2026</span> <span data-brand>Satpaev</span></span>
+    <a class="link" data-channel href="#" hidden>Наш канал</a>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

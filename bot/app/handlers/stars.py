@@ -8,22 +8,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..cb import In, Nav, Shop
 from ..db.models import User
-from ..services import settings
+from ..services import media, settings
 from ..services.orders import client_order_kb, create_order, created_text
 from ..states import StarsSt
-from ..ui import back_menu, btn, kb, show
+from ..ui import back_menu, kb, mbtn, show
 from ..utils import clean_username, h, money, num, round_up
 
 router = Router(name="stars")
+t = settings.t
 
 
 def price_for(qty: int) -> tuple[Decimal, Decimal]:
-    unit = Decimal("0")
+    unit = Decimal(str(settings.star_tiers()[0][1]))
     for min_qty, price in settings.star_tiers():
         if qty >= min_qty:
             unit = Decimal(str(price))
-    if unit == 0:
-        unit = Decimal(str(settings.star_tiers()[0][1]))
     return unit, round_up(unit * qty)
 
 
@@ -31,16 +30,9 @@ def min_qty() -> int:
     return settings.star_tiers()[0][0]
 
 
-def stars_screen() -> tuple[str, object]:
-    tiers = settings.star_tiers()
-    lines = [f"• от <b>{num(q)}</b> шт: <b>{num(p)} ₸</b> за звезду" for q, p in tiers]
-    text = (
-        "⭐ <b>Звёзды Telegram</b>\n\n"
-        "Чем больше берёте, тем дешевле звезда:\n" + "\n".join(lines) + "\n\n"
-        f"⏱ Выдача: <b>{h(settings.get('sla_stars'))}</b>\n"
-        f"📦 Минимум: <b>{num(min_qty())}</b> звёзд\n\n"
-        "Выберите количество или введите своё 👇"
-    )
+async def stars_view(target) -> None:
+    tiers = "\n".join(t("stars_tier", qty=num(q), price=num(p)) for q, p in settings.star_tiers())
+    text = t("stars_screen", tiers=tiers, sla=h(settings.get("sla_stars")), min=num(min_qty()))
     b = InlineKeyboardBuilder()
     for q in settings.get("star_presets") or []:
         try:
@@ -52,31 +44,25 @@ def stars_screen() -> tuple[str, object]:
         _, total = price_for(q)
         b.button(text=f"{num(q)} ⭐ · {money(total)}", callback_data=Shop(sec="stars", a="qty", v=str(q)))
     b.adjust(2)
-    b.row(btn("✏️ Своё количество", Shop(sec="stars", a="custom")))
+    b.row(mbtn("stars_custom", Shop(sec="stars", a="custom")))
     b.row(*back_menu())
-    return text, b.as_markup()
+    await show(target, text, b.as_markup(), photo=media.photo("stars"))
 
 
 @router.callback_query(Nav.filter(F.to == "stars"))
 async def nav_stars(cb: CallbackQuery) -> None:
-    text, markup = stars_screen()
-    await show(cb, text, markup)
+    await stars_view(cb)
 
 
 async def ask_recipient(target, state: FSMContext, user: User, qty: int) -> None:
     await state.set_state(StarsSt.recipient)
     await state.update_data(qty=qty)
-    unit, total = price_for(qty)
+    _, total = price_for(qty)
     rows = []
     if user.username:
-        rows.append([btn(f"🙋 Себе (@{user.username})", In(a="st_me"))])
-    rows.append([btn("◀️ Назад", Nav(to="stars"))])
-    await show(
-        target,
-        f"⭐ <b>{num(qty)} звёзд</b> · {money(total)}\n\n"
-        "Кому отправить? Напишите юзернейм получателя, например <code>@username</code>",
-        kb(*rows),
-    )
+        rows.append([mbtn("stars_me", In(a="st_me"), username=user.username)])
+    rows.append([mbtn("back", Nav(to="stars"))])
+    await show(target, t("stars_recipient", qty=num(qty), total=money(total)), kb(*rows))
 
 
 @router.callback_query(Shop.filter((F.sec == "stars") & (F.a == "qty")))
@@ -87,14 +73,14 @@ async def pick_qty(cb: CallbackQuery, callback_data: Shop, state: FSMContext, us
 @router.callback_query(Shop.filter((F.sec == "stars") & (F.a == "custom")))
 async def custom_qty(cb: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(StarsSt.qty)
-    await show(cb, f"✏️ Введите количество звёзд (минимум {num(min_qty())}):", kb([btn("◀️ Назад", Nav(to="stars"))]))
+    await show(cb, t("stars_custom", min=num(min_qty())), kb([mbtn("back", Nav(to="stars"))]))
 
 
 @router.message(StarsSt.qty)
 async def input_qty(message: Message, state: FSMContext, user: User) -> None:
     raw = (message.text or "").replace(" ", "")
     if not raw.isdigit() or int(raw) < min_qty() or int(raw) > 1_000_000:
-        await message.answer(f"Нужно целое число от {num(min_qty())}. Попробуйте ещё раз:")
+        await message.answer(t("stars_bad_qty", min=num(min_qty())))
         return
     await ask_recipient(message, state, user, int(raw))
 
@@ -107,13 +93,9 @@ async def confirm(target, state: FSMContext, recipient: str) -> None:
     await state.set_state(StarsSt.confirm)
     await show(
         target,
-        "🧾 <b>Проверьте заказ</b>\n\n"
-        f"⭐ Количество: <b>{num(qty)}</b>\n"
-        f"👤 Получатель: <b>@{h(recipient)}</b>\n"
-        f"💰 Цена за звезду: {num(unit)} ₸\n"
-        f"💳 К оплате: <b>{money(total)}</b>\n"
-        f"⏱ Выдача: {h(settings.get('sla_stars'))}",
-        kb([btn("✅ Оформить", In(a="st_ok"))], [btn("◀️ Изменить", Nav(to="stars"))]),
+        t("stars_confirm", qty=num(qty), recipient=h(recipient), unit=num(unit), total=money(total),
+          sla=h(settings.get("sla_stars"))),
+        kb([mbtn("confirm", In(a="st_ok"))], [mbtn("change", Nav(to="stars"))]),
     )
 
 
@@ -126,7 +108,7 @@ async def recipient_me(cb: CallbackQuery, state: FSMContext, user: User) -> None
 async def input_recipient(message: Message, state: FSMContext) -> None:
     uname = clean_username(message.text)
     if not uname:
-        await message.answer("Похоже, это не юзернейм. Пример: <code>@durov</code>")
+        await message.answer(t("stars_bad_recipient"))
         return
     await confirm(message, state, uname)
 
@@ -138,7 +120,7 @@ async def place(cb: CallbackQuery, state: FSMContext, session: AsyncSession, use
     qty = int(data.get("qty", 0))
     recipient = data.get("recipient", "")
     if qty < min_qty() or not recipient:
-        await nav_stars(cb)
+        await stars_view(cb)
         return
     unit, total = price_for(qty)
     order = await create_order(
@@ -147,3 +129,4 @@ async def place(cb: CallbackQuery, state: FSMContext, session: AsyncSession, use
         total, {"qty": qty, "recipient": recipient},
     )
     await show(cb, created_text(order), client_order_kb(order))
+

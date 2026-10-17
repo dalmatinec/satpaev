@@ -6,26 +6,63 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..cb import Adm, Nav
 from ..db.models import User
-from ..services import settings
-from ..ui import answer, btn, kb, send_safe, show
+from ..services import media, settings
+from ..texts import strip_html
+from ..ui import answer, btn, kb, mbtn, send_safe, show
+from ..utils import clean_username, h
 
 router = Router(name="start")
 
 
 def main_kb(is_admin: bool):
     site = str(settings.get("site_url") or "")
-    site_btn = btn("🌐 Наш сайт", url=site) if site.startswith(("http://", "https://")) else btn("🌐 Наш сайт", Nav(to="site"))
-    rows = [
-        [btn("⭐ Звёзды", Nav(to="stars")), btn("🎁 NFT подарки", Nav(to="gifts"))],
-        [btn("💎 Юзернеймы", Nav(to="un")), btn("💱 Обмен", Nav(to="ex"))],
-        [btn("🛠 Разработка и сервера", Nav(to="dev"))],
-        [btn("📦 Мои заказы", Nav(to="orders")), btn("👥 Рефералы", Nav(to="ref"))],
-        [btn("💬 Связаться", Nav(to="support")), btn("⭐ Отзывы", Nav(to="reviews"))],
-        [site_btn],
-    ]
+    rows = []
+    for row in settings.menu_layout():
+        buttons = []
+        for key in row:
+            if key == "site" and site.startswith(("http://", "https://")):
+                buttons.append(mbtn("site", url=site))
+            else:
+                buttons.append(mbtn(key, Nav(to=key)))
+        rows.append(buttons)
     if is_admin:
         rows.append([btn("⚙️ Админка", Adm(s="menu"))])
     return kb(*rows)
+
+
+async def show_menu(target, user: User | None, is_admin: bool) -> None:
+    name = h(user.full_name.split()[0]) if user and user.full_name else ""
+    await show(target, settings.t("welcome", name=name), main_kb(is_admin), photo=media.photo("welcome"))
+
+
+async def deep_link(payload: str, message: Message, state: FSMContext, session: AsyncSession, user: User) -> bool:
+    """Ссылки вида t.me/bot?start=stars_500 с сайта и из постов. True, если обработано."""
+    from . import dev, exchange, gifts, my_orders, referral, stars, support, usernames
+
+    if payload.startswith("stars_") and payload[6:].isdigit():
+        qty = int(payload[6:])
+        if qty >= stars.min_qty():
+            await stars.ask_recipient(message, state, user, qty)
+            return True
+    if payload.startswith("un_"):
+        uname = clean_username(payload[3:])
+        if uname:
+            await usernames.check_and_confirm(message, state, uname)
+            return True
+    screens = {
+        "stars": lambda: stars.stars_view(message),
+        "gifts": lambda: gifts.gift_page(message, session, 0),
+        "un": lambda: usernames.un_view(message),
+        "ex": lambda: exchange.ex_view(message, session),
+        "dev": lambda: dev.dev_view(message, session),
+        "ref": lambda: referral.ref_view(message, session, user),
+        "support": lambda: support.support_view(message, state),
+        "orders": lambda: my_orders.orders_view(message, session, user, 0),
+    }
+    if payload in screens:
+        await screens[payload]()
+        return True
+    return False
 
 
 @router.message(CommandStart())
@@ -45,15 +82,17 @@ async def cmd_start(
         if ref_id != user.id and await session.get(User, ref_id):
             user.referrer_id = ref_id
             await session.commit()
-            await send_safe(message.bot, ref_id, "🎉 По вашей ссылке пришёл новый друг! Вы получите процент с его заказов.")
-    await show(message, settings.rich("welcome"), main_kb(is_admin))
+            await send_safe(message.bot, ref_id, settings.t("ref_new"))
+    if args and await deep_link(args, message, state, session, user):
+        return
+    await show_menu(message, user, is_admin)
 
 
 @router.callback_query(Nav.filter(F.to == "menu"))
-async def nav_menu(cb: CallbackQuery, is_admin: bool) -> None:
-    await show(cb, settings.rich("welcome"), main_kb(is_admin))
+async def nav_menu(cb: CallbackQuery, user: User, is_admin: bool) -> None:
+    await show_menu(cb, user, is_admin)
 
 
 @router.callback_query(Nav.filter(F.to == "site"))
 async def nav_site(cb: CallbackQuery) -> None:
-    await answer(cb, "🌐 Сайт скоро откроется. Следите за новостями в канале!", alert=True)
+    await answer(cb, strip_html(settings.t("site_soon")), alert=True)

@@ -13,10 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..cb import Adm, Nav
 from ..config import config
 from ..db.models import SupportLink, User
-from ..services import settings, workhours
+from ..services import media, settings, workhours
 from ..services.orders import tag_name
 from ..states import SupportSt
-from ..ui import btn, kb, show
+from ..ui import btn, kb, mbtn, show
 from ..utils import h
 
 log = logging.getLogger(__name__)
@@ -26,16 +26,15 @@ _last_header: dict[int, tuple[float, dict[int, int]]] = {}
 _last_after_hours: dict[int, float] = {}
 
 
+async def support_view(target, state: FSMContext) -> None:
+    await state.set_state(SupportSt.chat)
+    await show(target, settings.t("support_screen"), kb([mbtn("finish_chat", Nav(to="menu"))]),
+               photo=media.photo("support"))
+
+
 @router.callback_query(Nav.filter(F.to == "support"))
 async def nav_support(cb: CallbackQuery, state: FSMContext) -> None:
-    await state.set_state(SupportSt.chat)
-    await show(
-        cb,
-        "💬 <b>Связь с менеджером</b>\n\n"
-        "Напишите сообщение, ответ придёт прямо сюда.\n"
-        "Можно отправлять текст, фото, файлы и голосовые.",
-        kb([btn("✅ Завершить", Nav(to="menu"))]),
-    )
+    await support_view(cb, state)
 
 
 async def _react(message: Message) -> None:
@@ -81,7 +80,7 @@ async def forward_to_admins(message: Message, user: User, session: AsyncSession)
         last = _last_after_hours.get(user.id, 0.0)
         if now - last > 3 * 3600:
             _last_after_hours[user.id] = now
-            await show(message, settings.rich("after_hours"))
+            await show(message, settings.t("after_hours", time=h(settings.get("work_from"))))
 
 
 async def deliver_to_user(bot: Bot, admin_message: Message, user_id: int) -> tuple[bool, str]:
@@ -109,6 +108,6 @@ async def fallback(message: Message, user: User, session: AsyncSession, is_admin
         await message.answer("ℹ️ Чтобы ответить клиенту, сделайте реплай на его сообщение.\nАдминка: /start → ⚙️ Админка")
         return
     if message.text and message.text.startswith("/"):
-        await message.answer("Нажмите /start, чтобы открыть меню.")
+        await message.answer(settings.t("unknown_cmd"))
         return
     await forward_to_admins(message, user, session)

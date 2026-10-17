@@ -14,7 +14,7 @@ from ...db.models import Order, RefAccrual, Review, User
 from ...services import backup, posting, settings
 from ...services.reviews import review_post, reviews_target
 from ...ui import answer, btn, kb, send_safe, show
-from ...utils import Rich, h, money, num, parse_number, rich_store
+from ...utils import h, money, num, parse_number
 from .common import Ctx, ask, op, screen
 
 router = Router(name="admin_misc")
@@ -52,7 +52,7 @@ async def ref_view(target, session: AsyncSession, cbd: Adm) -> None:
             b.row(btn(f"💸 {u.mention if u else rid} · {money(total)} ({cnt})", Adm(s="ref", a="pay", i=rid)))
     b.row(btn("✏️ Процент", Adm(s="ref", a="pct")),
           btn("🔁 От " + ("суммы" if settings.get("ref_base") == "profit" else "прибыли"), Adm(s="ref", a="base")))
-    b.row(btn("⚙️ Админка", Adm(s="menu")))
+    b.row(btn("◀️ Ещё", Adm(s="more")))
     await show(target, "\n".join(lines), b.as_markup())
 
 
@@ -79,7 +79,7 @@ async def on_ref(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, s
             RefAccrual.referrer_id == callback_data.i, RefAccrual.paid.is_(False)).values(paid=True))
         await session.commit()
         if total:
-            await send_safe(cb.bot, callback_data.i, f"💸 Вам выплачено <b>{money(total)}</b> по реферальной программе. Спасибо!")
+            await send_safe(cb.bot, callback_data.i, settings.t("ref_paid", amount=money(total)))
     await ref_view(cb, session, Adm(s="ref"))
 
 
@@ -154,7 +154,7 @@ async def bk_view(target, session: AsyncSession, cbd: Adm) -> None:
         kb(
             [btn("💾 Сделать бэкап сейчас", Adm(s="bk", a="now"))],
             [btn("⏰ Изменить время", Adm(s="bk", a="time"))],
-            [btn("⚙️ Админка", Adm(s="menu"))],
+            [btn("◀️ Ещё", Adm(s="more"))],
         ),
     )
 
@@ -191,11 +191,10 @@ async def set_view(target, session: AsyncSession, cbd: Adm) -> None:
         f"📢 Канал: {h(settings.get('channel_link') or 'нет')}\n"
         f"📝 Отзывы: {h(settings.get('reviews_link') or 'нет')}\n"
         f"🌐 Сайт: {h(site)}\n\n"
-        "Тексты с премиум эмодзи: приветствие, оплата, ночной автоответ."
+        "Тексты, кнопки и картинки меняются в «🧩 Ещё»."
     )
     await show(target, text, kb(
-        [btn("🏷 Название", Adm(s="set", a="brand")), btn("👋 Приветствие", Adm(s="set", a="rich", v="welcome"))],
-        [btn("💳 Текст оплаты", Adm(s="set", a="rich", v="pay_info")), btn("🌙 Автоответ", Adm(s="set", a="rich", v="after_hours"))],
+        [btn("🏷 Название", Adm(s="set", a="brand"))],
         [btn(f"🕐 Время работы: {_onoff(settings.get('work_enabled'))}", Adm(s="set", a="work"))],
         [btn("▶️ Начало", Adm(s="set", a="time", v="work_from")), btn("⏹ Конец", Adm(s="set", a="time", v="work_to"))],
         [btn("💎 Наценка", Adm(s="set", a="num", v="uname_markup")),
@@ -204,7 +203,7 @@ async def set_view(target, session: AsyncSession, cbd: Adm) -> None:
         [btn("📢 Ссылка канала", Adm(s="set", a="url", v="channel_link")),
          btn("📝 Ссылка отзывов", Adm(s="set", a="url", v="reviews_link"))],
         [btn("🌐 Ссылка сайта", Adm(s="set", a="url", v="site_url"))],
-        [btn("⚙️ Админка", Adm(s="menu"))],
+        [btn("◀️ Ещё", Adm(s="more"))],
     ))
 
 
@@ -221,12 +220,6 @@ async def on_set(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, s
     back = Adm(s="set")
     if a == "brand":
         await ask(cb, state, "set_text", "🏷 Введите название магазина:", back, key="brand")
-    elif a == "rich" and key in ("welcome", "pay_info", "after_hours"):
-        current = settings.rich(key)
-        await show(cb, current if current.text else Rich("(пусто)"))
-        await ask(cb.message, state, "set_rich",
-                  "☝️ Сейчас текст такой.\n\nПришлите новый одним сообщением, премиум эмодзи и форматирование сохранятся. "
-                  "«Пропустить» вернёт стандартный текст.", back, skip=True, key=key)
     elif a == "work":
         await settings.put(session, "work_enabled", not settings.get("work_enabled"))
         await session.commit()
@@ -254,20 +247,6 @@ async def op_set_text(ctx: Ctx) -> None:
         await ctx.target.answer("Пришлите текст:")
         return
     await settings.put(ctx.session, ctx.data["key"], ctx.text.strip()[:64])
-    await _back(ctx)
-
-
-@op("set_rich")
-async def op_set_rich(ctx: Ctx) -> None:
-    key = ctx.data["key"]
-    if ctx.message is None:
-        await settings.reset(ctx.session, key)
-    else:
-        if not ctx.text:
-            await ctx.target.answer("Пришлите текст сообщением:")
-            return
-        entities = ctx.message.entities if ctx.message.text else ctx.message.caption_entities
-        await settings.put(ctx.session, key, rich_store(ctx.text, entities))
     await _back(ctx)
 
 

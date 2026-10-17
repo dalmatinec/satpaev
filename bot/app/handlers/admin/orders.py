@@ -9,7 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...cb import Adm, Shop
 from ...db.models import Order, User
 from ...services import orders as svc
-from ...ui import btn, kb, pager, send_safe, show
+from ...texts import strip_html
+from ...services import settings
+from ...ui import btn, kb, mbtn, pager, send_safe, show
 from ...utils import h, money, parse_number
 from .common import Ctx, ask, op, screen
 
@@ -50,8 +52,8 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
         b.button(text=mark + name, callback_data=Adm(s="ord", v=key))
     b.adjust(3, 2)
     for o in rows:
-        icon = svc.STATUSES.get(o.status, "").split(" ")[0]
-        b.row(btn(f"{icon} #{o.id} · {svc.kind_name(o.kind)} · {money(o.amount) if o.amount else 'без цены'}",
+        icon = svc.status_icon(o.status)
+        b.row(btn(f"{icon} #{o.id} · {svc.kind_plain(o.kind)} · {money(o.amount) if o.amount else 'без цены'}",
                   Adm(s="ord", a="card", i=o.id)))
     pager(b, page, pages, lambda p: Adm(s="ord", v=flt, p=p))
     b.row(btn("⚙️ Админка", Adm(s="menu")))
@@ -76,8 +78,8 @@ async def stages(target, session: AsyncSession, order_id: int) -> None:
         await card(target, session, order_id)
         return
     done = (order.details or {}).get("stages") or {}
-    rows = [[btn(("✅ " if key in done else "") + name, Adm(s="ord", a="stage", i=order.id, v=key))]
-            for key, name in svc.STAGES]
+    rows = [[btn(("✅ " if key in done else "") + strip_html(svc.stage_name(key)), Adm(s="ord", a="stage", i=order.id, v=key))]
+            for key in svc.STAGE_KEYS]
     rows.append([btn("◀️ К заказу", Adm(s="ord", a="card", i=order.id))])
     await show(
         target,
@@ -160,9 +162,9 @@ async def op_price(ctx: Ctx) -> None:
         await ctx.session.commit()
         await send_safe(
             ctx.bot, order.user_id,
-            f"💵 <b>Предложение по заказу #{order.id}</b>\n\n{svc.client_card(order)}\n\nПодходит?",
-            kb([btn("✅ Согласен", Shop(sec="ord", a="agree", i=order.id)),
-                btn("✖️ Отказаться", Shop(sec="ord", a="decline", i=order.id))]),
+            settings.t("quote_offer", id=order.id, card=svc.client_card(order)),
+            kb([mbtn("agree", Shop(sec="ord", a="agree", i=order.id)),
+                mbtn("decline", Shop(sec="ord", a="decline", i=order.id))]),
         )
     await card(ctx.target, ctx.session, int(ctx.data["order_id"]))
 
