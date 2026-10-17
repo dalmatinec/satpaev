@@ -283,30 +283,82 @@ async def main() -> None:
         await poster.pool.close()
 
 
+def _ask(prompt: str) -> str:
+    try:
+        return input(prompt).strip()
+    except EOFError:
+        print("\nНет ввода. Запускайте вход в интерактивном терминале.")
+        sys.exit(1)
+
+
+async def _sign_in(client: TelegramClient) -> None:
+    """Вход по коду со своим циклом: неверный код можно ввести заново,
+    истёкший код бот перезапрашивает сам."""
+    phone = _ask("Номер телефона (+7...): ").replace(" ", "")
+    sent = await client.send_code_request(phone)
+    code_hash = sent.phone_code_hash
+    print("Код отправлен в Telegram (в чат «Telegram» на ваших устройствах).")
+    print("⚠️ Не пересылайте и не вставляйте код ни в какой чат Telegram: он сразу станет недействительным.")
+    for _ in range(6):
+        code = "".join(ch for ch in _ask("Код (или «r», чтобы прислать новый): ") if ch.isalnum())
+        if code.lower() == "r":
+            sent = await client.send_code_request(phone, force_sms=False)
+            code_hash = sent.phone_code_hash
+            print("Новый код отправлен.")
+            continue
+        if not code:
+            continue
+        try:
+            await client.sign_in(phone=phone, code=code, phone_code_hash=code_hash)
+            return
+        except errors.SessionPasswordNeededError:
+            for _ in range(3):
+                try:
+                    await client.sign_in(password=getpass("Облачный пароль (2FA): "))
+                    return
+                except errors.PasswordHashInvalidError:
+                    print("Неверный пароль, попробуйте ещё раз.")
+            print("Пароль не подошёл 3 раза, запустите вход заново.")
+            sys.exit(1)
+        except errors.PhoneCodeInvalidError:
+            print("Неверный код, введите ещё раз.")
+        except errors.PhoneCodeExpiredError:
+            print("Код устарел. Отправляю новый...")
+            sent = await client.send_code_request(phone)
+            code_hash = sent.phone_code_hash
+        except errors.FloodWaitError as e:
+            print(f"Telegram просит подождать {e.seconds} сек. Попробуйте позже.")
+            sys.exit(1)
+    print("Слишком много попыток, запустите вход заново.")
+    sys.exit(1)
+
+
 async def login() -> None:
     if not API_ID or not API_HASH:
         print("Сначала укажите TG_API_ID и TG_API_HASH в .env (получить на https://my.telegram.org)")
         sys.exit(1)
     client = make_client()
-    print("Вход в аккаунт для публикации в канал. Код придёт в Telegram.")
-    await client.start(
-        phone=lambda: input("Номер телефона (+7...): ").strip(),
-        code_callback=lambda: input("Код из Telegram: ").strip(),
-        password=lambda: getpass("Облачный пароль (2FA), если есть: "),
-    )
-    me = await client.get_me()
-    print(f"✅ Вошли как {me.first_name} (@{me.username})")
-    if CHANNEL:
-        try:
-            target = int(CHANNEL) if CHANNEL.lstrip("-").isdigit() else CHANNEL
-            if isinstance(target, int):
-                async for _ in client.iter_dialogs(limit=300):
-                    pass
-            entity = await client.get_entity(target)
-            print(f"✅ Канал найден: {getattr(entity, 'title', CHANNEL)}")
-        except Exception as e:
-            print(f"⚠️ Канал {CHANNEL} не найден ({e}). Проверьте CHANNEL_ID и что аккаунт админ канала.")
-    await client.disconnect()
+    print("Вход в аккаунт для публикации в канал.")
+    await client.connect()
+    try:
+        if await client.is_user_authorized():
+            print("Аккаунт уже авторизован.")
+        else:
+            await _sign_in(client)
+        me = await client.get_me()
+        print(f"✅ Вошли как {me.first_name} (@{me.username})")
+        if CHANNEL:
+            try:
+                target = int(CHANNEL) if CHANNEL.lstrip("-").isdigit() else CHANNEL
+                if isinstance(target, int):
+                    async for _ in client.iter_dialogs(limit=300):
+                        pass
+                entity = await client.get_entity(target)
+                print(f"✅ Канал найден: {getattr(entity, 'title', CHANNEL)}")
+            except Exception as e:
+                print(f"⚠️ Канал {CHANNEL} не найден ({e}). Проверьте CHANNEL_ID и что аккаунт админ канала.")
+    finally:
+        await client.disconnect()
     for suffix in (".session", ".session-journal"):
         path = SESSION + suffix
         if os.path.exists(path):
