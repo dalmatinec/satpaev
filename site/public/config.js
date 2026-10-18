@@ -2,8 +2,8 @@
 // на сервере, его создаёт deploy.sh, и обновления из git его не затирают.
 window.SITE = {
   brand: "Satpaev",
-  bot: "",                  // юзернейм бота без @ (задаётся в config.local.js)
-  manager: "",              // аккаунт менеджера без @ (задаётся в config.local.js)
+  bot: "satboxbot",         // юзернейм бота без @ (можно переопределить в config.local.js)
+  manager: "tonkeeper_8",   // аккаунт менеджера без @
   channel: "",              // ссылка на канал, например https://t.me/your_channel
 
   // юзернеймы, которые крутятся на главном экране
