@@ -16,6 +16,26 @@ set_env() {
   if grep -q "^$1=" .env; then sed -i "s|^$1=.*|$1=$2|" .env; else echo "$1=$2" >> .env; fi
 }
 
+# проверка связи с ботом: бот после перезапуска поднимается 10-30 секунд, поэтому ждём до минуты
+check_api() {
+  printf "Проверяю связь с ботом"
+  for _ in $(seq 1 30); do
+    if curl -fsS -m 3 -o /dev/null "${API_UPSTREAM}/api/health" 2>/dev/null; then
+      echo; echo "✅ Бот отдаёт данные сайту (курсы, цены, тексты)"; return 0
+    fi
+    printf "."; sleep 2
+  done
+  echo
+  echo "⚠️ Бот не отвечает на ${API_UPSTREAM}. Сайт работает, но со старыми курсами и без поиска юзеров."
+  if [ -d ~/satpaev ]; then
+    echo "   Состояние бота:"
+    (cd ~/satpaev && docker compose ps bot 2>/dev/null | tail -n +2 | sed 's/^/   /')
+    (cd ~/satpaev && docker compose logs --tail 8 bot 2>/dev/null | sed 's/^/   /')
+  fi
+  echo "   Обновить бота: cd ~/satpaev && git pull && docker compose up -d --build"
+  return 1
+}
+
 [ -f .env ] || cp .env.example .env
 # shellcheck disable=SC1091
 . ./.env
@@ -144,9 +164,7 @@ NGINX
     echo "✅ Сайт: http://${IP}:8080"
     echo "   Для https без порта: ./deploy.sh domain"
   fi
-  curl -fsS -m 5 -o /dev/null "${API_UPSTREAM}/api/health" \
-    && echo "✅ Бот отдаёт данные сайту (курсы, цены, тексты)" \
-    || echo "⚠️ API бота не отвечает: обновите бота (cd ~/satpaev && git pull && docker compose up -d --build)"
+  check_api || true
   exit 0
 fi
 
@@ -180,3 +198,4 @@ elif [ "${HTTP_PORT}" = "80" ]; then
 else
   echo "✅ Сайт: http://${IP}:${HTTP_PORT}"
 fi
+check_api || true
