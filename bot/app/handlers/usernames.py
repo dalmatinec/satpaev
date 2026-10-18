@@ -88,6 +88,10 @@ async def ready_buy(cb: CallbackQuery, callback_data: Shop, session: AsyncSessio
     if not item or not item.is_active:
         await show(cb, t("un_sold"), kb([mbtn("un_to_list", Shop(sec="un", a="list"))]))
         return
+    _, price_kzt = ready_price(item)
+    if price_kzt is not None and price_kzt < settings.min_order():
+        await show(cb, t("min_order", min=money(settings.min_order())), kb([mbtn("un_to_list", Shop(sec="un", a="list"))]))
+        return
     await state.set_state(BuySt.confirm)
     await state.update_data(item_id=item.id)
     await show(

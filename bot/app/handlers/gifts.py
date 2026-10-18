@@ -64,6 +64,9 @@ async def gift_buy(cb: CallbackQuery, callback_data: Shop, session: AsyncSession
     if not item or not item.is_active:
         await show(cb, t("gift_sold"), kb([mbtn("to_gifts", Nav(to="gifts"))]))
         return
+    if item.price and item.price < settings.min_order():
+        await show(cb, t("min_order", min=money(settings.min_order())), kb([mbtn("to_gifts", Nav(to="gifts"))]))
+        return
     await state.set_state(BuySt.confirm)
     await state.update_data(item_id=item.id)
     await show(

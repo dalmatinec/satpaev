@@ -13,7 +13,8 @@ from ..utils import Rich, entities_from_store
 
 DEFAULTS: dict = {
     "brand": config.brand,
-    "star_tiers": [[500, 12], [1000, 11.5], [5000, 11]],
+    "star_tiers": [[500, 20]],
+    "min_order": 10000,
     "star_presets": [500, 1000, 2500, 5000, 10000],
     "sla_stars": "до 3 часов",
     "sla_exchange": "от 5 до 30 минут",
@@ -61,6 +62,15 @@ async def load(session_maker) -> None:
         rows = (await session.execute(select(Setting))).scalars().all()
         _cache.clear()
         _cache.update({r.key: r.value for r in rows})
+
+
+def min_order():
+    from decimal import Decimal
+
+    try:
+        return Decimal(str(get("min_order") or 0))
+    except Exception:
+        return Decimal(0)
 
 
 def is_set(key: str) -> bool:

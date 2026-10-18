@@ -222,7 +222,7 @@ async def on_stars(cb: CallbackQuery, callback_data: Adm, session: AsyncSession,
     if callback_data.a == "tiers":
         await ask(cb, state, "star_tiers",
                   "✏️ Пришлите сетку: каждая строка «от скольки штук» и «цена за звезду».\n\n"
-                  "Пример:\n<code>500 12\n1000 11.5\n5000 11</code>\n\nПервая строка задаёт минимальный заказ.",
+                  "Пример:\n<code>500 20\n1000 19.5\n5000 19</code>\n\nПервая строка задаёт минимальный заказ.",
                   back)
     elif callback_data.a == "presets":
         await ask(cb, state, "star_presets", "✏️ Пришлите количества для кнопок через пробел:\n<code>50 100 250 500 1000 2500 5000</code>", back)

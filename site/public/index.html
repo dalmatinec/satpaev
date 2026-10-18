@@ -5,16 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Satpaev: звёзды, NFT подарки и юзернеймы Telegram</title>
   <meta name="description" content="Звёзды Telegram оптом, NFT подарки, коллекционные юзернеймы через Fragment, обмен и разработка ботов. Заказ в Telegram боте.">
-  <meta name="theme-color" content="#0f0b1f">
+  <meta name="theme-color" content="#08090d">
   <meta property="og:title" content="Satpaev: звёзды, NFT подарки и юзернеймы Telegram">
   <meta property="og:description" content="Звёзды оптом, NFT подарки, юзернеймы под заказ, обмен и разработка ботов.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- набор иконок: тонкая линия 1.5, один стиль на весь сайт -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.6l2.55 5.17 5.7.83-4.13 4.02.98 5.68L12 16.62l-5.1 2.68.98-5.68L3.75 9.6l5.7-.83z"/></symbol>
+      <symbol id="i-gift" viewBox="0 0 24 24"><path d="M4.5 11.5h15V20a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z"/><path d="M3.5 7.5h17v4h-17z"/><path d="M12 7.5V21"/><path d="M12 7.5C10.6 4.4 7.2 3.9 7.2 5.9c0 1.7 2.7 1.6 4.8 1.6z"/><path d="M12 7.5c1.4-3.1 4.8-3.6 4.8-1.6 0 1.7-2.7 1.6-4.8 1.6z"/></symbol>
+      <symbol id="i-gem" viewBox="0 0 24 24"><path d="M6.5 4h11l3.5 5.2L12 20.5 3 9.2z"/><path d="M3 9.2h18"/><path d="M9.6 4 8 9.2l4 11.3 4-11.3L14.4 4"/></symbol>
+      <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8.5h14"/><path d="M14.5 5 18 8.5 14.5 12"/><path d="M20 15.5H6"/><path d="M9.5 12 6 15.5 9.5 19"/></symbol>
+      <symbol id="i-code" viewBox="0 0 24 24"><path d="M8 7.5 3.5 12 8 16.5"/><path d="M16 7.5l4.5 4.5-4.5 4.5"/><path d="M13.6 5.5l-3.2 13"/></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3.5 3 10.6l6.6 2.6 2.7 6.8z"/><path d="M9.6 13.2 21 3.5"/></symbol>
+      <symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.6"/><path d="M15.6 8.6v4.6a2.4 2.4 0 0 0 4.8 0V12a8.4 8.4 0 1 0-3.4 6.75"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10.5H9.5L5 19.5v-3.5H4z"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M7 17 17 7"/><path d="M8.5 7H17v8.5"/></symbol>
+    </defs>
+  </svg>
   <!-- фон: звёзды на канвасе и плавающее сияние -->
   <canvas class="sky" aria-hidden="true"></canvas>
   <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -30,29 +44,29 @@
       <a href="#dev">Разработка</a>
       <a href="#faq">Вопросы</a>
     </nav>
-    <a class="btn btn-gold btn-sm magnetic" data-bot href="#">Открыть бота</a>
+    <a class="btn btn-gold btn-sm magnetic" data-bot href="#"><svg class="i i-sm"><use href="#i-send"/></svg>Открыть бота</a>
   </header>
 
   <main id="top">
     <!-- ===== главный экран ===== -->
     <section class="hero">
       <div class="hero-copy reveal">
-        <p class="pill glass"><span class="dot"></span>Коллекционные юзернеймы, звёзды и NFT подарки</p>
+        <p class="pill glass"><span class="dot"></span>Звёзды, NFT подарки, юзернеймы и обмен в Telegram</p>
         <h1 class="handle" aria-label="Юзернейм">
           <span class="handle-at">@</span><span class="handle-name" data-scramble>satpaev</span>
         </h1>
         <p class="hero-text">Займём нужный вам юзер, проведём через аукцион Fragment и передадим как NFT.
           Звёзды оптом, подарки, обмен и разработка ботов. Всё в одном Telegram боте.</p>
         <div class="hero-actions">
-          <a class="btn btn-gold magnetic" data-bot href="#">Заказать в боте</a>
+          <a class="btn btn-gold magnetic" data-bot href="#"><svg class="i i-sm"><use href="#i-send"/></svg>Заказать в боте</a>
           <a class="btn btn-glass magnetic" href="#check">Проверить юзер</a>
         </div>
       </div>
 
       <div class="hero-stage" aria-hidden="true">
-        <div class="orb orb-1"><span>🎁</span></div>
-        <div class="orb orb-2"><span>⭐</span></div>
-        <div class="orb orb-3"><span>💎</span></div>
+        <div class="orb orb-1"><svg class="i"><use href="#i-gift"/></svg></div>
+        <div class="orb orb-2"><svg class="i"><use href="#i-star"/></svg></div>
+        <div class="orb orb-3"><svg class="i"><use href="#i-gem"/></svg></div>
         <article class="lot glass tilt">
           <div class="lot-shine"></div>
           <header class="lot-head">
@@ -83,34 +97,34 @@
       <h2 class="title reveal">Что можно заказать</h2>
       <div class="bento">
         <a class="tile glass spot tilt reveal tile-wide" data-bot-start="stars" href="#">
-          <span class="tile-emoji">⭐</span>
+          <span class="tile-icon"><svg class="i"><use href="#i-star"/></svg></span>
           <h3>Звёзды Telegram</h3>
           <p>На любой аккаунт, от 500 штук. Чем больше объём, тем дешевле звезда. Выдача до 3 часов.</p>
-          <span class="tile-go">Купить звёзды</span>
+          <span class="tile-go">Купить звёзды<svg class="i i-sm"><use href="#i-arrow"/></svg></span>
         </a>
         <a class="tile glass spot tilt reveal" data-bot-start="gifts" href="#">
-          <span class="tile-emoji">🎁</span>
+          <span class="tile-icon"><svg class="i"><use href="#i-gift"/></svg></span>
           <h3>NFT подарки</h3>
           <p>Витрина с фото и ценой. Ищете редкую модель или фон? Подберём.</p>
-          <span class="tile-go">Смотреть витрину</span>
+          <span class="tile-go">Смотреть витрину<svg class="i i-sm"><use href="#i-arrow"/></svg></span>
         </a>
         <a class="tile glass spot tilt reveal" data-bot-start="un" href="#">
-          <span class="tile-emoji">💎</span>
+          <span class="tile-icon"><svg class="i"><use href="#i-gem"/></svg></span>
           <h3>Юзернеймы</h3>
           <p>Готовые красивые юзеры и поиск под заказ с передачей через Fragment.</p>
-          <span class="tile-go">Выбрать юзер</span>
+          <span class="tile-go">Выбрать юзер<svg class="i i-sm"><use href="#i-arrow"/></svg></span>
         </a>
         <a class="tile glass spot tilt reveal" data-bot-start="ex" href="#">
-          <span class="tile-emoji">💱</span>
+          <span class="tile-icon"><svg class="i"><use href="#i-swap"/></svg></span>
           <h3>Обмен</h3>
           <p>Курс на день фиксирован, сделка от 5 до 30 минут.</p>
-          <span class="tile-go">Узнать курс</span>
+          <span class="tile-go">Узнать курс<svg class="i i-sm"><use href="#i-arrow"/></svg></span>
         </a>
         <a class="tile glass spot tilt reveal" data-bot-start="dev" href="#">
-          <span class="tile-emoji">🛠</span>
+          <span class="tile-icon"><svg class="i"><use href="#i-code"/></svg></span>
           <h3>Боты и сайты</h3>
           <p>Разработка под ключ, деплой на сервер, домен и SSL, поддержка.</p>
-          <span class="tile-go">Оставить заявку</span>
+          <span class="tile-go">Оставить заявку<svg class="i i-sm"><use href="#i-arrow"/></svg></span>
         </a>
       </div>
     </section>
@@ -120,20 +134,21 @@
       <div class="calc glass reveal">
         <div class="calc-copy">
           <h2 class="title">Калькулятор звёзд</h2>
-          <p class="muted">Двигайте ползунок: цена одной звезды падает с объёмом. Нажмите «Купить», бот откроется уже с этим количеством.</p>
+          <p class="muted">Двигайте ползунок, итог считается сразу. Нажмите «Купить», бот откроется уже с этим количеством.</p>
+          <p class="calc-note">Минимальный заказ на любую услугу: <b data-min-order>10 000 ₸</b></p>
           <ul class="tiers" data-tiers></ul>
         </div>
         <div class="calc-box">
           <label class="calc-label" for="qty">Количество звёзд</label>
           <div class="calc-qty">
             <input id="qty" class="calc-input" type="number" inputmode="numeric" min="500" max="100000" step="10" value="1000">
-            <span>⭐</span>
+            <svg class="i calc-star"><use href="#i-star"/></svg>
           </div>
           <input class="range" type="range" min="0" max="1000" value="300" aria-label="Количество звёзд" data-range>
           <div class="chips" data-chips></div>
           <div class="calc-total">
-            <div><span class="lot-k">Цена звезды</span><b data-unit>9 ₸</b></div>
-            <div><span class="lot-k">Итого</span><b class="calc-sum" data-sum>4 500 ₸</b></div>
+            <div><span class="lot-k">Цена звезды</span><b data-unit>20 ₸</b></div>
+            <div><span class="lot-k">Итого</span><b class="calc-sum" data-sum>20 000 ₸</b></div>
           </div>
           <a class="btn btn-gold btn-wide magnetic" data-buy-stars href="#">Купить в боте</a>
         </div>
@@ -146,7 +161,7 @@
         <h2 class="title">Хотите конкретный юзер?</h2>
         <p class="muted">Введите юзернейм: проверим формат, а бот посмотрит его статус на Fragment и примет заявку.</p>
         <form class="check-form" data-check novalidate>
-          <span class="check-at">@</span>
+          <svg class="i check-at"><use href="#i-at"/></svg>
           <input class="check-input" name="u" placeholder="username" autocomplete="off" spellcheck="false" maxlength="32" aria-label="Юзернейм">
           <button class="btn btn-gold magnetic" type="submit">Заказать</button>
         </form>
@@ -194,6 +209,8 @@
       <div class="faq">
         <details class="glass reveal"><summary>Как оплатить заказ?</summary>
           <p>Оформляете заказ в боте, менеджер присылает реквизиты прямо в чат. После оплаты нажимаете «Я оплатил», и заказ уходит в работу.</p></details>
+        <details class="glass reveal"><summary>Есть минимальная сумма заказа?</summary>
+          <p>Да, минимальный заказ на любую услугу 10 000 ₸. Для звёзд это от 500 штук.</p></details>
         <details class="glass reveal"><summary>Сколько ждать звёзды?</summary>
           <p>Обычно быстрее, но мы обещаем не дольше 3 часов с момента оплаты.</p></details>
         <details class="glass reveal"><summary>Что если юзер, который я хочу, уже занят?</summary>
@@ -210,8 +227,8 @@
         <h2 class="title">Всё оформляется в боте</h2>
         <p class="muted">Выберите услугу, бот посчитает цену и передаст заказ менеджеру.</p>
         <div class="cta-actions">
-          <a class="btn btn-gold magnetic" data-bot href="#">Открыть бота</a>
-          <a class="btn btn-glass magnetic" data-manager href="#" hidden>Написать <span data-manager-name></span></a>
+          <a class="btn btn-gold magnetic" data-bot href="#"><svg class="i i-sm"><use href="#i-send"/></svg>Открыть бота</a>
+          <a class="btn btn-glass magnetic" data-manager href="#" hidden><svg class="i i-sm"><use href="#i-chat"/></svg>Написать <span data-manager-name></span></a>
         </div>
       </div>
     </section>

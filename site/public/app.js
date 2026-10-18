@@ -16,6 +16,8 @@
     $$("[data-brand]").forEach(function (el) { el.textContent = cfg.brand; });
     document.title = cfg.brand + ": звёзды, NFT подарки и юзернеймы Telegram";
   }
+  var minOrder = $("[data-min-order]");
+  if (minOrder && cfg.minOrder) minOrder.textContent = String(cfg.minOrder).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " ₸";
   var year = $("[data-year]");
   if (year) year.textContent = new Date().getFullYear();
   var channel = $("[data-channel]");
@@ -43,14 +45,14 @@
       W = window.innerWidth; H = window.innerHeight;
       canvas.width = W * dpr; canvas.height = H * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      var count = Math.min(260, Math.round((W * H) / 6500));
+      var count = Math.min(220, Math.round((W * H) / 8000));
       stars = [];
       for (var i = 0; i < count; i++) {
         stars.push({
           x: Math.random() * W, y: Math.random() * H,
-          r: Math.random() * 1.3 + .2, z: Math.random() * .8 + .2,
+          r: Math.random() * 1.05 + .15, z: Math.random() * .8 + .2,
           tw: Math.random() * Math.PI * 2, sp: Math.random() * .02 + .005,
-          gold: Math.random() < .12
+          gold: Math.random() < .06
         });
       }
     };
@@ -61,11 +63,11 @@
       for (var i = 0; i < stars.length; i++) {
         var s = stars[i];
         s.tw += s.sp;
-        var a = .35 + Math.sin(s.tw) * .35 + .3;
+        var a = .25 + Math.sin(s.tw) * .3 + .2;
         var x = s.x + px * s.z * 18, y = s.y + py * s.z * 18;
         ctx.globalAlpha = Math.max(0, Math.min(1, a));
-        ctx.fillStyle = s.gold ? "#f5c451" : "#ffffff";
-        ctx.beginPath(); ctx.arc(x, y, s.r * (s.gold ? 1.4 : 1), 0, 6.283); ctx.fill();
+        ctx.fillStyle = s.gold ? "#d8bd84" : "#e9e9f2";
+        ctx.beginPath(); ctx.arc(x, y, s.r * (s.gold ? 1.3 : 1), 0, 6.283); ctx.fill();
       }
       // падающая звезда раз в несколько секунд
       if (!shooting && t - last > 4200 + Math.random() * 6000) {
@@ -76,7 +78,7 @@
         shooting.l += 14;
         var sx = shooting.x - shooting.l, sy = shooting.y + shooting.l * .45;
         var g = ctx.createLinearGradient(sx, sy, sx + 120, sy - 54);
-        g.addColorStop(0, "rgba(255,230,160,.9)"); g.addColorStop(1, "rgba(255,230,160,0)");
+        g.addColorStop(0, "rgba(241,223,180,.7)"); g.addColorStop(1, "rgba(241,223,180,0)");
         ctx.globalAlpha = 1; ctx.strokeStyle = g; ctx.lineWidth = 1.6;
         ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + 120, sy - 54); ctx.stroke();
         if (shooting.l > W) shooting = null;
@@ -134,7 +136,7 @@
       el.addEventListener("pointermove", function (e) {
         var r = el.getBoundingClientRect();
         var x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-        el.style.transform = "perspective(900px) rotateX(" + ((.5 - y) * 8) + "deg) rotateY(" + ((x - .5) * 10) + "deg)";
+        el.style.transform = "perspective(1000px) rotateX(" + ((.5 - y) * 4) + "deg) rotateY(" + ((x - .5) * 5) + "deg)";
         el.style.setProperty("--sx", x * 100 + "%"); el.style.setProperty("--sy", y * 100 + "%");
       });
       el.addEventListener("pointerleave", function () { el.style.transform = ""; });
@@ -144,7 +146,7 @@
       el.addEventListener("pointermove", function (e) {
         var r = el.getBoundingClientRect();
         var x = e.clientX - r.left - r.width / 2, y = e.clientY - r.top - r.height / 2;
-        el.style.transform = "translate(" + x * .18 + "px," + y * .28 + "px)";
+        el.style.transform = "translate(" + x * .1 + "px," + y * .18 + "px)";
       });
       el.addEventListener("pointerleave", function () { el.style.transform = ""; });
     });

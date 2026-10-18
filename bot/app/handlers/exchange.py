@@ -105,6 +105,9 @@ async def amount_input(message: Message, state: FSMContext, session: AsyncSessio
     if r.min_qty and qty < r.min_qty:
         await message.answer(t("ex_min", min=num(r.min_qty), code=h(r.code)))
         return
+    if kzt < settings.min_order():
+        await message.answer(t("min_order", min=money(settings.min_order())))
+        return
     await state.update_data(qty=str(qty), kzt=str(kzt), rate=str(rate))
     await state.set_state(ExSt.confirm)
     key = "ex_confirm_buy" if side == "buy" else "ex_confirm_sell"

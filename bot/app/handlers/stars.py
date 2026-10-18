@@ -27,7 +27,15 @@ def price_for(qty: int) -> tuple[Decimal, Decimal]:
 
 
 def min_qty() -> int:
-    return settings.star_tiers()[0][0]
+    """Минимум звёзд: первая строка сетки, но не дешевле минимального заказа."""
+    qty = settings.star_tiers()[0][0]
+    minimum = settings.min_order()
+    for _ in range(10):
+        unit, total = price_for(qty)
+        if total >= minimum or unit <= 0:
+            break
+        qty = max(qty + 1, int((minimum / unit).to_integral_value(rounding="ROUND_CEILING")))
+    return qty
 
 
 async def stars_view(target) -> None:

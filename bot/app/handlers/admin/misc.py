@@ -271,6 +271,7 @@ async def set_view(target, session: AsyncSession, cbd: Adm) -> None:
     text = (
         "⚙️ <b>Настройки</b>\n\n"
         f"🏷 Название: <b>{h(settings.get('brand'))}</b>\n"
+        f"💰 Минимальный заказ: <b>{money(settings.min_order())}</b>\n"
         f"🕐 Рабочее время: <b>{_onoff(settings.get('work_enabled'))}</b>, "
         f"с <b>{h(settings.get('work_from'))}</b> до <b>{h(settings.get('work_to'))}</b>\n"
         f"💎 Наценка на юзеры: <b>x{num(settings.get('uname_markup'))}</b>\n"
@@ -282,7 +283,7 @@ async def set_view(target, session: AsyncSession, cbd: Adm) -> None:
         "Тексты, кнопки и картинки меняются в «🧩 Ещё»."
     )
     await show(target, text, kb(
-        [btn("🏷 Название", Adm(s="set", a="brand"))],
+        [btn("🏷 Название", Adm(s="set", a="brand")), btn("💰 Мин. заказ", Adm(s="set", a="num", v="min_order"))],
         [btn(f"🕐 Время работы: {_onoff(settings.get('work_enabled'))}", Adm(s="set", a="work"))],
         [btn("▶️ Начало", Adm(s="set", a="time", v="work_from")), btn("⏹ Конец", Adm(s="set", a="time", v="work_to"))],
         [btn("💎 Наценка", Adm(s="set", a="num", v="uname_markup")),
@@ -296,6 +297,7 @@ async def set_view(target, session: AsyncSession, cbd: Adm) -> None:
 
 
 NUM_LABELS = {
+    "min_order": "минимальную сумму любого заказа в тенге, например 10000",
     "uname_markup": "наценку на готовые юзеры (множитель, например 2)",
     "uname_hold_days": "через сколько дней после «Занят» напомнить про аукцион",
     "uname_auction_days": "сколько дней длится аукцион",
@@ -351,7 +353,8 @@ async def op_set_time(ctx: Ctx) -> None:
 @op("set_num")
 async def op_set_num(ctx: Ctx) -> None:
     value = parse_number(ctx.text)
-    if value is None or value > 1000:
+    limit = 10 ** 9 if ctx.data["key"] == "min_order" else 1000
+    if value is None or value > limit:
         await ctx.target.answer("Нужно число:")
         return
     await settings.put(ctx.session, ctx.data["key"], float(value))
