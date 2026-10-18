@@ -22,14 +22,14 @@ def _api_line() -> str:
 
     st = web_api.STATS
     if not config.api_port:
-        return "⚪ выключен (нет API_PORT в docker-compose.yml)"
+        return "⚪ выключена (нет API_PORT в docker-compose.yml)"
     if not st["running"]:
-        return "🔴 не запустился: " + h(st["error"] or "перезапустите бота")
+        return "🔴 не запустилась: " + h(st["error"] or "перезапустите бота")
     if not st["last"]:
-        return f"🟡 работает на порту {st['port']}, но сайт ещё ни разу не обращался"
+        return "🟡 бот готов, сайт пока не заходил (обновите сайт: ./deploy.sh)"
     ago = int(time.time() - st["last"])
     when = f"{ago} с назад" if ago < 120 else f"{ago // 60} мин назад" if ago < 7200 else f"{ago // 3600} ч назад"
-    return f"🟢 работает, запросов за сутки: <b>{web_api.hits()}</b>, последний {when}"
+    return f"🟢 есть, запросов за сутки <b>{web_api.hits()}</b>, последний {when}"
 
 
 @screen("web")
@@ -44,22 +44,19 @@ async def web_view(target, session: AsyncSession, cbd: Adm, note: str = "") -> N
         app_line = "🟢 вкл" if on else "⚪ выкл, сайт откроется в браузере"
     text = (
         "🌐 <b>Сайт и Web App</b>\n\n"
-        f"🔗 Сайт: {h(site) or 'не задан'}\n"
-        f"🔌 Связь с сайтом: {_api_line()}\n"
+        f"<blockquote>🔗 Сайт: {h(site) or 'не задан'}\n"
+        f"🔌 Связь с ботом: {_api_line()}\n"
         f"📱 Web App: {app_line}\n"
-        f"🏷 Кнопка у поля ввода: «{h(settings.get('webapp_menu_text') or 'Открыть')}»\n\n"
-        "Сайт сам берёт из бота курсы (💱 Курсы), цены звёзд (⭐ Звёзды), минимальный заказ и тексты. "
-        "Изменения появляются на сайте в течение минуты.\n\n"
-        "Web App: кнопка слева от поля ввода и «🌐 Наш сайт» в меню открывают сайт прямо внутри Telegram. "
-        "Название и цвет кнопки в меню: 🔘 Кнопки и экраны → Главное меню."
+        f"🏷 Кнопка у поля ввода: «{h(settings.get('webapp_menu_text') or 'Открыть')}»</blockquote>\n"
+        "Курсы, цены звёзд, минимальный заказ и тексты сайт берёт из бота сам, обновление в течение минуты.\n\n"
+        "<i>Web App открывает сайт прямо в Telegram: кнопкой слева от поля ввода и «🌐 Наш сайт» в меню.</i>"
         + (f"\n\n{note}" if note else "")
     )
     await show(target, text, kb(
-        [btn("✏️ Тексты сайта", Adm(s="tx", a="grp", v="site")), btn("🔗 Ссылка сайта", Adm(s="web", a="url"))],
-        [btn(("🟢" if on else "⚪") + " Web App", Adm(s="web", a="toggle")),
-         btn("🏷 Кнопка у поля ввода", Adm(s="web", a="menu"))],
-        [btn("🔄 Обновить", Adm(s="web", a="apply"))],
-        [btn("◀️ Ещё", Adm(s="more"))],
+        [btn("✏️ Тексты сайта", Adm(s="tx", a="grp", v="site")), btn("🔗 Ссылка", Adm(s="web", a="url"))],
+        [btn(("🟢 Web App" if on else "⚪ Web App"), Adm(s="web", a="toggle")),
+         btn("🏷 Кнопка меню", Adm(s="web", a="menu"))],
+        [btn("🔄 Обновить", Adm(s="web", a="apply")), btn("◀️ Ещё", Adm(s="more"))],
     ))
 
 

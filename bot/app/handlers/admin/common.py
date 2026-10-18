@@ -119,22 +119,22 @@ async def admin_menu(target, session: AsyncSession, cbd: Adm | None = None) -> N
     ) or 0
     new_reviews = await session.scalar(select(func.count(Review.id)).where(Review.status == "new")) or 0
     online, state_txt, _ = await poster_status(session)
-    orders_btn = f"📋 Заказы ({active})" + (f" 🔥{attention}" if attention else "")
+    orders_btn = f"📋 Заказы · {active}" + (f"   🔥 {attention}" if attention else "")
+    hot = f" · 🔥 ждут ответа: <b>{attention}</b>" if attention else ", всё под контролем"
     text = (
-        f"⚙️ <b>Админка {settings.get('brand')}</b>\n\n"
-        f"📋 Активных заказов: <b>{active}</b>, требуют внимания: <b>{attention}</b>\n"
+        f"⚙️ <b>{settings.get('brand')}</b> · админка\n\n"
+        f"<blockquote>📋 Заказов в работе: <b>{active}</b>{hot}\n"
         f"📝 Новых отзывов: <b>{new_reviews}</b>\n"
-        f"📢 Постер канала: {state_txt}"
+        f"📢 Постер: {state_txt}</blockquote>"
     )
     await show(target, text, kb(
-        [btn(orders_btn, Adm(s="ord"))],
-        [btn("💱 Курсы", Adm(s="rates")), btn("⭐ Звёзды", Adm(s="stars"))],
-        [btn("🎁 Подарки", Adm(s="cat", v="gift")), btn("💎 Юзеры", Adm(s="cat", v="uname"))],
-        [btn("🛠 Услуги", Adm(s="cat", v="service")), btn("🖼 Портфолио", Adm(s="cat", v="portfolio"))],
-        [btn("📢 Посты", Adm(s="ch")), btn("📨 Рассылка", Adm(s="bc"))],
-        [btn("👤 Клиенты", Adm(s="cl")), btn("📊 Статистика", Adm(s="stat"))],
-        [btn(f"📝 Отзывы ({new_reviews})", Adm(s="rev")), btn("🧩 Ещё", Adm(s="more"))],
-        [btn("🏠 Клиентское меню", Nav(to="menu"))],
+        [btn(orders_btn, Adm(s="ord"), style="primary")],
+        [btn("💱 Курсы", Adm(s="rates")), btn("⭐ Звёзды", Adm(s="stars")), btn("🎁 Подарки", Adm(s="cat", v="gift"))],
+        [btn("💎 Юзеры", Adm(s="cat", v="uname")), btn("🛠 Услуги", Adm(s="cat", v="service")),
+         btn("🖼 Работы", Adm(s="cat", v="portfolio"))],
+        [btn("📢 Посты", Adm(s="ch")), btn("📨 Рассылка", Adm(s="bc")), btn("👤 Клиенты", Adm(s="cl"))],
+        [btn("📊 Статистика", Adm(s="stat")), btn(f"📝 Отзывы · {new_reviews}", Adm(s="rev"))],
+        [btn("🧩 Ещё", Adm(s="more")), btn("🏠 Меню клиента", Nav(to="menu"))],
     ))
 
 
@@ -166,13 +166,17 @@ async def cmd_edit(message: Message, session: AsyncSession, state: FSMContext) -
 
 
 async def more_menu(target, session: AsyncSession, cbd: Adm | None = None) -> None:
-    await show(target, "🧩 <b>Ещё</b>\n\nОформление бота и редкие настройки.", kb(
-        [btn(("🟢" if settings.is_editing(target.from_user.id if isinstance(target, CallbackQuery) else target.chat.id) else "⚪")
-             + " Режим редактирования", Adm(s="bt", a="mode"))],
-        [btn("✏️ Тексты", Adm(s="tx")), btn("🔘 Кнопки и экраны", Adm(s="bt"))],
-        [btn("🖼 Картинки", Adm(s="img")), btn("📢 Подписка на канал", Adm(s="sub"))],
-        [btn("🌐 Сайт и Web App", Adm(s="web")), btn("⚙️ Настройки", Adm(s="set"))],
-        [btn("👥 Рефералы", Adm(s="ref")), btn("💾 Бэкапы", Adm(s="bk"))],
+    uid = target.from_user.id if isinstance(target, CallbackQuery) else target.chat.id
+    editing = settings.is_editing(uid)
+    await show(target, (
+        "🧩 <b>Ещё</b>\n\n"
+        "<blockquote>🎨 Оформление: тексты, кнопки, картинки\n"
+        "🌐 Сайт, подписка, рефералы, бэкапы, настройки</blockquote>"
+    ), kb(
+        [btn(("🟢 Режим редактирования: вкл" if editing else "⚪ Режим редактирования: выкл"), Adm(s="bt", a="mode"))],
+        [btn("✏️ Тексты", Adm(s="tx")), btn("🔘 Кнопки", Adm(s="bt")), btn("🖼 Картинки", Adm(s="img"))],
+        [btn("🌐 Сайт", Adm(s="web")), btn("📢 Подписка", Adm(s="sub")), btn("👥 Рефералы", Adm(s="ref"))],
+        [btn("💾 Бэкапы", Adm(s="bk")), btn("⚙️ Настройки", Adm(s="set"))],
         [btn("◀️ Админка", Adm(s="menu"))],
     ))
 

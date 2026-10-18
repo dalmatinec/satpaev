@@ -16,7 +16,7 @@ from aiogram.types import (
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from .cb import Adm, Nav
+from .cb import Adm, AIn, Nav
 from .texts import fill
 from .utils import Rich
 
@@ -165,6 +165,21 @@ def kb(*rows: list[InlineKeyboardButton]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[list(r) for r in rows if r])
 
 
+_GREEN = ("➕", "✅", "🚀", "📢 Опубликовать", "💾 Сделать", "💾 Сохранить")
+_RED = ("🗑", "❌", "⛔", "🚫")
+
+
+def _admin_style(text: str, cb) -> str | None:
+    """В админке цвет ставится сам: зелёные кнопки создают и подтверждают, красные удаляют."""
+    if not isinstance(cb, (Adm, AIn)):
+        return None
+    if text.startswith(_GREEN):
+        return "success"
+    if text.startswith(_RED):
+        return "danger"
+    return None
+
+
 def btn(text: str, cb=None, url: str | None = None, icon: str | None = None, style: str | None = None,
         web_app: str | None = None) -> InlineKeyboardButton:
     extra = {}
@@ -172,6 +187,10 @@ def btn(text: str, cb=None, url: str | None = None, icon: str | None = None, sty
         extra["icon_custom_emoji_id"] = icon
     if style:
         extra["style"] = style
+    if style is None and cb is not None and not url and not web_app:
+        style = _admin_style(text, cb)
+        if style:
+            extra["style"] = style
     if web_app:
         return InlineKeyboardButton(text=text, web_app=WebAppInfo(url=web_app), **extra)
     if url:
