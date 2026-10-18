@@ -1,6 +1,6 @@
 from aiogram import Router
 
-from . import chats, dev, menu_button, exchange, gifts, my_orders, referral, start, stars, subscribe, support, usernames
+from . import chats, dev, menu_button, premium, exchange, gifts, my_orders, referral, start, stars, subscribe, support, usernames
 from .admin import build_router as build_admin_router
 
 
@@ -13,6 +13,7 @@ def build_routers() -> list[Router]:
         subscribe.router,
         start.router,
         stars.router,
+        premium.router,
         gifts.router,
         usernames.router,
         exchange.router,

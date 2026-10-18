@@ -12,7 +12,9 @@
   var data = {
     bot: cfg.bot || "", brand: cfg.brand || "SatBox", min_order: cfg.minOrder || 10000,
     rates: [], ton_kzt: 0, stars: { tiers: cfg.stars || [[500, 20]], min_qty: 500 }, texts: {},
-    fee: { amount: 0, name: "Сервисный сбор" }
+    fee: { amount: 0, name: "Сервисный сбор" },
+    premium: [{ months: 3, period: "3 месяца", usd: 17, kzt: null }, { months: 6, period: "6 месяцев", usd: 32, kzt: null },
+      { months: 12, period: "1 год", usd: 60, kzt: null }]
   };
 
   var fmt = function (n, digits) {
@@ -110,6 +112,7 @@
         if (j.stars && Array.isArray(j.stars.tiers) && j.stars.tiers.length) data.stars = j.stars;
         data.texts = j.texts || {};
         if (j.fee && typeof j.fee.amount === "number") data.fee = j.fee;
+        if (Array.isArray(j.premium)) data.premium = j.premium;
         return true;
       })
       .catch(function () { clearTimeout(timer); return false; });
@@ -448,13 +451,40 @@
     } else play();
   }
 
+  // ---------- Telegram Premium ----------
+  var plansBox = $("[data-premium]");
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function renderPremium() {
+    if (!plansBox) return;
+    plansBox.textContent = "";
+    var list = (data.premium || []).filter(function (p) { return p && p.months > 0 && p.usd > 0; });
+    var best = null;
+    list.forEach(function (p) { if (!best || p.usd / p.months < best.usd / best.months) best = p; });
+    list.forEach(function (p) {
+      var card = el("article", "plan glass" + (p === best && list.length > 1 ? " best" : ""));
+      var ic = el("span", "plan-ic");
+      var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "i"); svg.setAttribute("width", "24"); svg.setAttribute("height", "24");
+      var use = document.createElementNS("http://www.w3.org/2000/svg", "use"); use.setAttribute("href", "#i-crown");
+      svg.appendChild(use); ic.appendChild(svg); card.appendChild(ic);
+      card.appendChild(el("span", "plan-period", p.period || (p.months + " мес.")));
+      card.appendChild(el("b", "plan-usd", fmt(p.usd) + " $"));
+      card.appendChild(el("span", "plan-kzt", p.kzt ? "≈ " + tenge(p.kzt) : "цена в ₸ в боте"));
+      card.appendChild(el("span", "plan-month", "≈ " + fmt(p.usd / p.months, 2) + " $ в месяц"));
+      var a = el("a", "btn " + (p === best ? "btn-neon" : "btn-outline") + " btn-wide", "Подключить");
+      a.href = botLink("premium_" + p.months);
+      card.appendChild(a);
+      plansBox.appendChild(card);
+    });
+  }
+
   // ---------- старт ----------
   function render() {
-    applyLinks(); applyTexts(); renderRates(); renderCodes(); calcEx(); renderTiers();
+    applyLinks(); applyTexts(); renderRates(); renderCodes(); calcEx(); renderTiers(); renderPremium();
     setQty(qtyInput ? +qtyInput.value : 1000, true);
   }
   render();
   loadSite().then(function (ok) { if (ok) render(); });
   // курсы и тексты подтягиваются раз в минуту, пока вкладка открыта
-  setInterval(function () { if (!document.hidden) loadSite().then(function (ok) { if (ok) { renderRates(); renderCodes(); calcEx(); } }); }, 60000);
+  setInterval(function () { if (!document.hidden) loadSite().then(function (ok) { if (ok) { renderRates(); renderCodes(); calcEx(); renderPremium(); } }); }, 60000);
 })();

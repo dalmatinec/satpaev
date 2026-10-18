@@ -239,7 +239,7 @@ def screen_kb(
         used.update(k for k in row if k in buttons)
         if line:
             rows.append(line)
-    if screen != "menu":
+    if screen not in ("menu", "more"):
         extra = [b for k, b in buttons.items() if k not in used]
         for b in extra:
             rows.append([b])

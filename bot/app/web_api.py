@@ -106,12 +106,18 @@ def _json(data: dict, status: int = 200, cache: int = 0) -> web.Response:
 
 
 async def _build_site(bot: Bot, sm) -> dict:
+    from .handlers import premium
     from .handlers.stars import min_qty
 
     async with sm() as session:
         rates = (await session.execute(
             select(Rate).where(Rate.is_active.is_(True)).order_by(Rate.sort, Rate.id)
         )).scalars().all()
+        await premium.refresh_rate(session)
+    prem = []
+    for m, usd in premium.plans():
+        kzt = premium.price_kzt(usd)
+        prem.append({"months": m, "period": premium.period(m), "usd": float(usd), "kzt": float(kzt) if kzt else None})
     me = await bot.me()
     texts = {k: strip_html(settings.t(k)) for k, spec in TEXTS.items() if spec.group == "site"}
     return {
@@ -119,13 +125,14 @@ async def _build_site(bot: Bot, sm) -> dict:
         "bot": me.username,
         "min_order": float(settings.min_order()),
         "ton_kzt": float(settings.get("ton_kzt") or 0),
-        "sla": {k: str(settings.get(f"sla_{k}") or "") for k in ("stars", "exchange", "gifts")},
         "rates": [
             {"code": r.code, "buy": float(r.buy) if r.buy else None, "sell": float(r.sell) if r.sell else None,
              "min": float(r.min_qty) if r.min_qty else None}
             for r in rates if r.buy or r.sell
         ],
         "stars": {"tiers": [[q, p] for q, p in settings.star_tiers()], "min_qty": min_qty()},
+        "premium": prem,
+        "sla": {k: str(settings.get(f"sla_{k}") or "") for k in ("stars", "exchange", "gifts", "premium")},
         "fee": {"amount": float(settings.get("ex_fee") or 0),
                 "name": strip_html(str(settings.get("ex_fee_name") or "Сервисный сбор"))},
         "texts": texts,

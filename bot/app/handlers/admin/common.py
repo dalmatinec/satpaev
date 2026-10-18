@@ -129,7 +129,7 @@ async def admin_menu(target, session: AsyncSession, cbd: Adm | None = None) -> N
     )
     await show(target, text, kb(
         [btn(orders_btn, Adm(s="ord"), style="primary")],
-        [btn("💱 Курсы", Adm(s="rates")), btn("⭐ Звёзды", Adm(s="stars"))],
+        [btn("💱 Курсы", Adm(s="rates")), btn("⭐ Звёзды и Premium", Adm(s="stars"))],
         [btn("🎁 Подарки", Adm(s="cat", v="gift")), btn("💎 Юзеры", Adm(s="cat", v="uname"))],
         [btn("📢 Посты", Adm(s="ch")), btn("📨 Рассылка", Adm(s="bc"))],
         [btn("👤 Клиенты", Adm(s="cl")), btn("📊 Статистика", Adm(s="stat"))],

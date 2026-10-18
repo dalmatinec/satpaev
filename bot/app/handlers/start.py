@@ -16,7 +16,8 @@ from ..utils import clean_username, h
 router = Router(name="start")
 
 
-def main_kb(is_admin: bool = False):
+def menu_buttons() -> dict:
+    """Все кнопки главного меню по ключам (и для меню, и для вкладки «Ещё»)."""
     site = str(settings.get("site_url") or "")
     app_url = webapp.url()
     buttons = {}
@@ -26,9 +27,21 @@ def main_kb(is_admin: bool = False):
                 buttons[key] = mbtn("app", web_app=app_url)
         elif key == "site" and site.startswith(("http://", "https://")):
             buttons[key] = mbtn("site", url=site)  # обычная ссылка: откроется в браузере
+        elif key == "site":
+            buttons[key] = mbtn("site", Nav(to="site"))
         else:
             buttons[key] = mbtn(key, Nav(to=key))
-    return screen_kb("menu", buttons)
+    return buttons
+
+
+def main_kb(is_admin: bool = False):
+    return screen_kb("menu", menu_buttons())
+
+
+async def more_view(target) -> None:
+    buttons = menu_buttons()
+    buttons["home"] = mbtn("home", Nav(to="menu"))
+    await show(target, settings.t("more_screen"), screen_kb("more", buttons), edit=("more_screen", "more"))
 
 
 async def show_menu(target, user: User | None, is_admin: bool) -> None:
@@ -39,12 +52,16 @@ async def show_menu(target, user: User | None, is_admin: bool) -> None:
 
 async def deep_link(payload: str, message: Message, state: FSMContext, session: AsyncSession, user: User) -> bool:
     """Ссылки вида t.me/bot?start=stars_500 с сайта и из постов. True, если обработано."""
-    from . import dev, exchange, gifts, my_orders, referral, stars, support, usernames
+    from . import dev, exchange, gifts, my_orders, premium, referral, stars, support, usernames
 
     if payload.startswith("stars_") and payload[6:].isdigit():
         qty = int(payload[6:])
         if qty >= stars.min_qty():
             await stars.ask_recipient(message, state, user, qty)
+            return True
+    if payload.startswith("premium_") and payload[8:].isdigit():
+        await premium.refresh_rate(session)
+        if await premium.ask_recipient(message, state, user, int(payload[8:])):
             return True
     if payload.startswith("ex_"):
         from sqlalchemy import func, select
@@ -63,6 +80,8 @@ async def deep_link(payload: str, message: Message, state: FSMContext, session: 
             return True
     screens = {
         "stars": lambda: stars.stars_view(message),
+        "premium": lambda: premium.premium_view(message, session),
+        "more": lambda: more_view(message),
         "gifts": lambda: gifts.gift_page(message, session, 0),
         "un": lambda: usernames.un_view(message),
         "ex": lambda: exchange.ex_view(message, session),
@@ -129,6 +148,11 @@ async def nav_menu(cb: CallbackQuery, user: User, is_admin: bool, session: Async
         await show_menu(msg, user, is_admin)
         return
     await show_menu(cb, user, is_admin)
+
+
+@router.callback_query(Nav.filter(F.to == "more"))
+async def nav_more(cb: CallbackQuery) -> None:
+    await more_view(cb)
 
 
 @router.callback_query(Nav.filter(F.to == "site"))

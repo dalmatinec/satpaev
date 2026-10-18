@@ -21,6 +21,7 @@ GROUPS = {
     "main": "🏠 Главное",
     "stars": "⭐ Звёзды",
     "gifts": "🎁 Подарки",
+    "premium": "👑 Premium",
     "un": "💎 Юзернеймы",
     "ex": "💱 Обмен",
     "dev": "🛠 Разработка",
@@ -75,6 +76,30 @@ TEXTS: dict[str, TextSpec] = {
         "💳 К оплате: <b>{total}</b>\n"
         "⏱ Выдача: {sla}"
     ), ("qty", "recipient", "unit", "total", "sla")),
+
+    # ---------- Telegram Premium ----------
+    "premium_screen": T("premium", "Экран Premium", (
+        "👑 <b>Telegram Premium</b>\n\n"
+        "Подключим Premium вам или в подарок другу. Пароль и вход в аккаунт не нужны, только юзернейм.\n\n"
+        "{plans}\n\n"
+        "⏱ Подключение: <b>{sla}</b>\n\nВыберите срок 👇"
+    ), ("plans", "sla")),
+    "premium_plan": T("premium", "Строка тарифа", "• <b>{period}</b>: {usd} $ · <b>{kzt}</b>", ("period", "usd", "kzt")),
+    "premium_recipient": T("premium", "Кому подключить", (
+        "👑 <b>Premium на {period}</b> · {kzt}\n\n"
+        "Кому подключить? Напишите юзернейм, например <code>@username</code>"
+    ), ("period", "kzt")),
+    "premium_confirm": T("premium", "Подтверждение", (
+        "🧾 <b>Проверьте заказ</b>\n\n"
+        "👑 Telegram Premium: <b>{period}</b>\n"
+        "👤 Получатель: <b>@{recipient}</b>\n"
+        "💳 К оплате: <b>{kzt}</b> ({usd} $)\n"
+        "⏱ Подключение: {sla}"
+    ), ("period", "recipient", "kzt", "usd", "sla")),
+    "premium_empty": T("premium", "Нет тарифов", "👑 <b>Telegram Premium</b>\n\nЦены обновляются, напишите менеджеру."),
+
+    # ---------- ещё ----------
+    "more_screen": T("main", "Экран «Ещё»", "🧩 <b>Ещё</b>\n\nВыберите раздел 👇"),
 
     # ---------- подарки ----------
     "gifts_empty": T("gifts", "Витрина пуста", (
@@ -250,7 +275,7 @@ TEXTS: dict[str, TextSpec] = {
     )),
     "site_cta": T("site", "Главная кнопка", "Перейти в Telegram"),
     "site_f1_title": T("site", "Карточка 1: заголовок", "Быстро"),
-    "site_f1_text": T("site", "Карточка 1: текст", "Заказ оформляется в боте за минуту, звёзды приходят до 3 часов."),
+    "site_f1_text": T("site", "Карточка 1: текст", "Заказ оформляется в боте за минуту, выполнение от 15 минут до 3 часов."),
     "site_f2_title": T("site", "Карточка 2: заголовок", "Безопасно"),
     "site_f2_text": T("site", "Карточка 2: текст", "Оплата после согласования цены, каждый этап виден в боте."),
     "site_f3_title": T("site", "Карточка 3: заголовок", "На связи"),
@@ -263,7 +288,9 @@ TEXTS: dict[str, TextSpec] = {
     "site_s_un": T("site", "Сервис: юзернеймы", "Короткие и под заказ через Fragment"),
     "site_s_dev": T("site", "Сервис: боты", "Разработка ботов и сайтов"),
     "site_s_srv": T("site", "Сервис: сервера", "Деплой, домен, SSL, Docker"),
-    "site_ex_text": T("site", "Обмен: текст", "Курс фиксирован на день. Сделка занимает от 5 до 30 минут."),
+    "site_ex_text": T("site", "Обмен: текст", "Курс фиксирован на день. Сделка занимает от 15 минут до 3 часов."),
+    "site_s_premium": T("site", "Сервис: Premium", "3, 6 или 12 месяцев, без входа в аккаунт"),
+    "site_premium_text": T("site", "Premium: текст", "Подключим Premium вам или в подарок другу. Нужен только юзернейм."),
     "site_un_text": T("site", "Поиск юзера: текст", (
         "Введите юзернейм: покажем его статус на Fragment и будем обновлять в реальном времени."
     )),
@@ -271,6 +298,7 @@ TEXTS: dict[str, TextSpec] = {
 
     # ---------- статусы и названия ----------
     "kind_stars": T("names", "Вид: звёзды", "⭐ Звёзды"),
+    "kind_premium": T("names", "Вид: Premium", "👑 Telegram Premium"),
     "kind_gift": T("names", "Вид: подарок", "🎁 NFT подарок"),
     "kind_uname_ready": T("names", "Вид: готовый юзер", "💎 Юзернейм"),
     "kind_uname_custom": T("names", "Вид: юзер под заказ", "💎 Юзер под заказ"),
@@ -302,6 +330,8 @@ BUTTONS: dict[str, tuple[str, str]] = {
     "gifts": ("menu", "🎁 NFT подарки"),
     "un": ("menu", "💎 Юзернеймы"),
     "ex": ("menu", "💱 Обмен"),
+    "premium": ("menu", "👑 Telegram Premium"),
+    "more": ("menu", "🧩 Ещё"),
     "dev": ("menu", "🛠 Разработка и сервера"),
     "orders": ("menu", "📦 Мои заказы"),
     "ref": ("menu", "👥 Рефералы"),
@@ -328,6 +358,7 @@ BUTTONS: dict[str, tuple[str, str]] = {
     "no_text": ("common", "➡️ Без текста"),
 
     "stars_custom": ("shop", "✏️ Своё количество"),
+    "premium_me": ("shop", "🙋 Себе (@{username})"),
     "stars_me": ("shop", "🙋 Себе (@{username})"),
     "gift_view": ("shop", "🔗 Посмотреть подарок"),
     "to_gifts": ("shop", "🎁 К подаркам"),
@@ -375,7 +406,9 @@ MENU_KEYS = [k for k, (g, _) in BUTTONS.items() if g == "menu"]
 # «app» в меню по умолчанию нет: приложение открывается кнопкой слева от поля ввода.
 # Если понадобится, его можно добавить в раскладку меню словом app.
 BUTTON_STYLES = {"app": "primary"}
-DEFAULT_LAYOUT = [["ex", "un"], ["stars", "gifts"], ["dev"], ["ref", "support"], ["orders", "reviews"], ["site"]]
+DEFAULT_LAYOUT = [["ex", "un"], ["premium", "stars"], ["gifts"], ["dev"], ["more"]]
+# что лежит во вкладке «🧩 Ещё» главного меню
+MORE_LAYOUT = [["orders", "reviews"], ["ref", "support"], ["site"], ["home"]]
 
 # Экраны, где кнопки можно двигать. Ключ экрана: (название, раскладка по умолчанию, куда вернуться)
 # Динамические кнопки (товары, листалка) стоят над этими кнопками и не двигаются.
@@ -384,6 +417,8 @@ SCREENS: dict[str, tuple[str, list[list[str]], str]] = {
     "ex": ("💱 Обмен", [["write_manager"], ["home"]], "ex"),
     "un": ("💎 Юзернеймы", [["un_ready"], ["un_wish"], ["home"]], "un"),
     "stars": ("⭐ Звёзды", [["stars_custom"], ["home"]], "stars"),
+    "premium": ("👑 Premium", [["home"]], "premium"),
+    "more": ("🧩 Ещё", MORE_LAYOUT, "more"),
     "gift": ("🎁 Подарок", [["buy"], ["gift_view"], ["write_manager"], ["home"]], "gifts"),
     "dev": ("🛠 Разработка", [["cat_bots", "cat_sites"], ["cat_miniapp", "cat_servers"], ["cat_other"],
                              ["dev_pf"], ["dev_order"], ["home"]], "dev"),
@@ -396,7 +431,7 @@ SCREENS: dict[str, tuple[str, list[list[str]], str]] = {
 SCREEN_KEYS = list(SCREENS)
 
 # раздел текстов: экран, куда вернуться после правки
-GROUP_NAV = {"main": "menu", "stars": "stars", "gifts": "gifts", "un": "un", "ex": "ex", "dev": "dev",
+GROUP_NAV = {"main": "menu", "stars": "stars", "premium": "premium", "gifts": "gifts", "un": "un", "ex": "ex", "dev": "dev",
              "orders": "orders", "support": "support", "ref": "ref", "reviews": "reviews", "names": "orders",
              "sub": "menu", "site": "menu"}
 
@@ -405,6 +440,7 @@ GROUP_NAV = {"main": "menu", "stars": "stars", "gifts": "gifts", "un": "un", "ex
 IMAGES = {
     "welcome": "👋 Приветствие",
     "stars": "⭐ Звёзды",
+    "premium": "👑 Premium",
     "un": "💎 Юзернеймы",
     "ex": "💱 Обмен",
     "dev": "🛠 Разработка",

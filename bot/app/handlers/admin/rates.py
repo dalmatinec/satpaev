@@ -210,6 +210,14 @@ async def stars_view(target, session: AsyncSession, cbd: Adm) -> None:
     tiers = settings.star_tiers()
     lines = "\n".join(f"• от {num(q)} шт: {num(p)} ₸" for q, p in tiers)
     presets = ", ".join(str(x) for x in settings.get("star_presets") or [])
+    from ..premium import period, plans, refresh_rate, usd_rate
+
+    await refresh_rate(session)
+    rate = usd_rate()
+    own = bool(settings.get("premium_usd"))
+    plan_lines = "\n".join(
+        f"• {period(m)}: {num(usd)} $" + (f" = {money(usd * rate)}" if rate else "") for m, usd in plans()) or "не заданы"
+    rate_txt = (f"{num(rate)} ₸ " + ("(свой)" if own else "(продажа USDT из «💱 Курсы»)")) if rate else "не задан"
     await show(
         target,
         "⭐ <b>Звёзды</b>\n\n"
@@ -217,13 +225,18 @@ async def stars_view(target, session: AsyncSession, cbd: Adm) -> None:
         f"<b>Кнопки количества:</b> {h(presets)}\n"
         f"<b>Выдача звёзд:</b> {h(settings.get('sla_stars'))}\n"
         f"<b>Срок обмена:</b> {h(settings.get('sla_exchange'))}\n"
-        f"<b>Передача подарков:</b> {h(settings.get('sla_gifts'))}"
+        f"<b>Передача подарков:</b> {h(settings.get('sla_gifts'))}\n\n"
+        f"👑 <b>Telegram Premium</b>\n{plan_lines}\n"
+        f"<b>Курс $:</b> {rate_txt}\n"
+        f"<b>Подключение:</b> {h(settings.get('sla_premium'))}"
         + ("" if settings.is_set("star_tiers") else "\n\n⚠️ <b>Сейчас стоят цены по умолчанию.</b> Нажмите «Сетка цен» и задайте свои."),
         kb(
             [btn("✏️ Сетка цен", Adm(s="stars", a="tiers")), btn("✏️ Кнопки", Adm(s="stars", a="presets"))],
             [btn("⏱ Срок звёзд", Adm(s="stars", a="sla", v="sla_stars")),
              btn("⏱ Срок обмена", Adm(s="stars", a="sla", v="sla_exchange"))],
-            [btn("⏱ Срок подарков", Adm(s="stars", a="sla", v="sla_gifts"))],
+            [btn("⏱ Срок подарков", Adm(s="stars", a="sla", v="sla_gifts")),
+             btn("⏱ Срок Premium", Adm(s="stars", a="sla", v="sla_premium"))],
+            [btn("👑 Цены Premium", Adm(s="stars", a="prem")), btn("💵 Курс $", Adm(s="stars", a="prem_usd"))],
             [btn("⚙️ Админка", Adm(s="menu"))],
         ),
     )
@@ -239,8 +252,15 @@ async def on_stars(cb: CallbackQuery, callback_data: Adm, session: AsyncSession,
                   back)
     elif callback_data.a == "presets":
         await ask(cb, state, "star_presets", "✏️ Пришлите количества для кнопок через пробел:\n<code>50 100 250 500 1000 2500 5000</code>", back)
-    elif callback_data.a == "sla" and callback_data.v in ("sla_stars", "sla_exchange", "sla_gifts"):
-        await ask(cb, state, "sla", "⏱ Введите срок текстом, например «до 3 часов»:", back, key=callback_data.v)
+    elif callback_data.a == "sla" and callback_data.v in ("sla_stars", "sla_exchange", "sla_gifts", "sla_premium"):
+        await ask(cb, state, "sla", "⏱ Введите срок текстом, например «от 15 минут до 3 часов»:", back, key=callback_data.v)
+    elif callback_data.a == "prem":
+        await ask(cb, state, "premium_plans",
+                  "👑 Пришлите тарифы Premium: каждая строка «месяцев» и «цена в $».\n\n"
+                  "Пример:\n<code>3 17\n6 32\n12 60</code>", back)
+    elif callback_data.a == "prem_usd":
+        await ask(cb, state, "set_num", "💵 По какому курсу считать доллар для Premium, в тенге? Например <code>500</code>.\n"
+                  "<code>0</code>: брать курс продажи USDT из «💱 Курсы».", back, key="premium_usd")
     else:
         await stars_view(cb, session, callback_data)
 
@@ -285,5 +305,26 @@ async def op_sla(ctx: Ctx) -> None:
         return
     await ctx.state.clear()
     await settings.put(ctx.session, ctx.data["key"], ctx.text.strip()[:100])
+    await ctx.session.commit()
+    await stars_view(ctx.target, ctx.session, Adm(s="stars"))
+
+
+@op("premium_plans")
+async def op_premium_plans(ctx: Ctx) -> None:
+    rows = []
+    for line in (ctx.text or "").splitlines():
+        parts = line.replace(",", ".").replace("$", " ").split()
+        if len(parts) >= 2:
+            try:
+                m, usd = int(parts[0]), float(Decimal(parts[1]))
+            except Exception:
+                continue
+            if 0 < m <= 60 and usd > 0:
+                rows.append([m, usd])
+    if not rows:
+        await ctx.target.answer("Не нашёл ни одной строки. Формат: <code>3 17</code>")
+        return
+    await ctx.state.clear()
+    await settings.put(ctx.session, "premium_plans", sorted(rows)[:6])
     await ctx.session.commit()
     await stars_view(ctx.target, ctx.session, Adm(s="stars"))

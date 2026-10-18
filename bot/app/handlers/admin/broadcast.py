@@ -26,6 +26,7 @@ router = Router(name="admin_broadcast")
 SEGMENTS = {
     "all": "👥 Все",
     "stars": "⭐ Покупали звёзды",
+    "premium": "👑 Покупали Premium",
     "gift": "🎁 Покупали подарки",
     "uname": "💎 Покупали юзеры",
     "exchange": "💱 Делали обмен",
@@ -42,7 +43,7 @@ _running: dict = {"task": None, "stop": False}
 def segment_where(seg: str):
     base = User.is_blocked.is_(False)
     done = (Order.user_id == User.id) & (Order.status == "done")
-    kinds = {"stars": ("stars",), "gift": ("gift",), "uname": ("uname_ready", "uname_custom"),
+    kinds = {"stars": ("stars",), "premium": ("premium",), "gift": ("gift",), "uname": ("uname_ready", "uname_custom"),
              "exchange": ("exchange",), "dev": ("dev",)}
     if seg in kinds:
         return base & exists(select(Order.id).where(done, Order.kind.in_(kinds[seg])))

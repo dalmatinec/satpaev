@@ -16,7 +16,7 @@ from . import settings, workhours
 
 log = logging.getLogger(__name__)
 
-KIND_KEYS = ("stars", "gift", "uname_ready", "uname_custom", "exchange", "dev")
+KIND_KEYS = ("stars", "premium", "gift", "uname_ready", "uname_custom", "exchange", "dev")
 STATUS_KEYS = ("new", "quote", "wait_pay", "paid", "work", "done", "canceled")
 ACTIVE = ("new", "quote", "wait_pay", "paid", "work")
 STAGE_KEYS = ("reserved", "auction", "transferred")

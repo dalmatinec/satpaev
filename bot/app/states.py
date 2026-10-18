@@ -7,6 +7,11 @@ class StarsSt(StatesGroup):
     confirm = State()
 
 
+class PremSt(StatesGroup):
+    recipient = State()
+    confirm = State()
+
+
 class ExSt(StatesGroup):
     amount = State()
     confirm = State()

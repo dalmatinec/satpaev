@@ -16,9 +16,13 @@ DEFAULTS: dict = {
     "star_tiers": [[500, 20]],
     "min_order": 10000,
     "star_presets": [500, 1000, 2500, 5000, 10000],
-    "sla_stars": "до 3 часов",
-    "sla_exchange": "от 5 до 30 минут",
-    "sla_gifts": "до 3 часов",
+    "sla_stars": "от 15 минут до 3 часов",
+    "sla_exchange": "от 15 минут до 3 часов",
+    "sla_gifts": "от 15 минут до 3 часов",
+    "sla_premium": "от 15 минут до 3 часов",
+    # Telegram Premium: [месяцев, цена в $]; в тенге по курсу premium_usd (0 = курс продажи USDT)
+    "premium_plans": [[3, 17], [6, 32], [12, 60]],
+    "premium_usd": 0,
     "ton_kzt": 0,
     "ex_fee": 0,  # фиксированный сбор за каждую сделку обмена, ₸ (0 = без сбора)
     "ex_fee_name": "Сервисный сбор",
@@ -181,10 +185,13 @@ async def set_button(session: AsyncSession, key: str, **fields) -> None:
 def layout(screen: str) -> list[list[str]]:
     """Раскладка кнопок экрана с учётом правок админа."""
     default = SCREENS[screen][1] if screen in SCREENS else []
-    allowed = {k for row in default for k in row} | (set(MENU_KEYS) if screen == "menu" else set())
+    free = screen in ("menu", "more")  # кнопки главного меню можно переносить между меню и «Ещё»
+    allowed = {k for row in default for k in row} | (set(MENU_KEYS) if free else set())
     stored = (_cache.get("layouts") or {}).get(screen)
     if screen == "menu" and stored is None:
         stored = _cache.get("menu_layout")  # старый ключ
+    if screen == "menu" and isinstance(stored, list) and not any("more" in r for r in stored if isinstance(r, list)):
+        stored = None  # раскладка сохранена до появления «Ещё»: берём новую по умолчанию
     if not isinstance(stored, list):
         return [list(r) for r in default]
     clean, seen = [], set()
@@ -193,7 +200,7 @@ def layout(screen: str) -> list[list[str]]:
         seen.update(keys)
         if keys:
             clean.append(keys)
-    if screen != "menu":  # на служебных экранах кнопки не теряются, даже если раскладка старая
+    if not free:  # на служебных экранах кнопки не теряются, даже если раскладка старая
         for row in default:
             missing = [k for k in row if k not in seen]
             if missing:
