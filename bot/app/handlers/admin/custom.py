@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...cb import Adm, Nav
 from ...services import media, settings
 from ...texts import BUTTON_GROUPS, BUTTON_STYLES, BUTTONS, GROUP_NAV, GROUPS, IMAGES, MENU_KEYS, SCREEN_KEYS, SCREENS, TEXTS, strip_html
-from ...ui import answer, btn, kb, show
+from ...ui import answer, btn, kb, pager, show
 from ...utils import h
 from .common import Ctx, ask, op, screen
 
@@ -21,16 +21,23 @@ STYLE_NAMES = {"": "обычный", "primary": "🔵 синий", "success": "�
 
 # ======================= ТЕКСТЫ =======================
 
+TX_PER_PAGE = 8   # текстов на странице раздела
+BT_PER_PAGE = 12  # кнопок на странице (по две в ряд)
+
 @screen("tx")
 async def tx_view(target, session: AsyncSession, cbd: Adm) -> None:
     if cbd.a == "grp" and cbd.v in GROUPS:
+        keys = [k for k, spec in TEXTS.items() if spec.group == cbd.v]
+        pages = max(1, (len(keys) + TX_PER_PAGE - 1) // TX_PER_PAGE)
+        page = max(0, min(cbd.p, pages - 1))
         b = InlineKeyboardBuilder()
-        for key, spec in TEXTS.items():
-            if spec.group == cbd.v:
-                mark = "✏️ " if settings.text_is_custom(key) else ""
-                b.row(btn(f"{mark}{spec.title}", Adm(s="tx", a="card", v=key)))
+        for key in keys[page * TX_PER_PAGE:(page + 1) * TX_PER_PAGE]:
+            mark = "✏️ " if settings.text_is_custom(key) else ""
+            b.row(btn(f"{mark}{TEXTS[key].title}"[:48], Adm(s="tx", a="card", v=key)))
+        pager(b, page, pages, lambda p: Adm(s="tx", a="grp", v=cbd.v, p=p))
         b.row(btn("◀️ Разделы", Adm(s="tx")))
-        await show(target, f"✏️ <b>Тексты</b> · {GROUPS[cbd.v]}\n\n✏️ отмечены изменённые вами.", b.as_markup())
+        await show(target, f"✏️ <b>Тексты</b> · {GROUPS[cbd.v]}\n\n"
+                           f"Всего: {len(keys)}. ✏️ отмечены изменённые вами.", b.as_markup())
         return
     if cbd.a == "card" and cbd.v in TEXTS:
         await tx_card(target, cbd.v)
@@ -129,15 +136,23 @@ def _sname(idx: int) -> str | None:
     return SCREEN_KEYS[idx - 1] if 0 < idx <= len(SCREEN_KEYS) else None
 
 
+FREE = ("menu", "more")  # кнопки главного меню можно переносить между меню и вкладкой «Ещё»
+
+
 def _allowed(screen: str) -> list[str]:
     if screen == "menu":
         return list(MENU_KEYS)
+    if screen == "more":
+        return [k for k in MENU_KEYS if k != "more"] + ["home"]
     return [k for row in SCREENS[screen][1] for k in row]
 
 
 def _hidden(screen: str) -> list[str]:
-    shown = {k for row in settings.layout(screen) for k in row}
-    return [k for k in _allowed(screen) if k not in shown]
+    if screen in FREE:  # скрытые: нет ни в меню, ни во вкладке «Ещё»
+        shown = {k for s in FREE for row in settings.layout(s) for k in row}
+    else:
+        shown = {k for row in settings.layout(screen) for k in row}
+    return [k for k in _allowed(screen) if k not in shown and k != "app"]
 
 
 def _preview_btn(key: str, screen: str):
@@ -159,17 +174,22 @@ async def bt_view(target, session: AsyncSession, cbd: Adm) -> None:
     if cbd.a == "screens":
         b = InlineKeyboardBuilder()
         for key, (name, _, _) in SCREENS.items():
+            if key in ("menu", "more"):  # у них свои кнопки на главном экране раздела
+                continue
             b.button(text=name, callback_data=Adm(s="bt", a="scr", v=key))
         b.adjust(2)
         b.row(btn("◀️ Кнопки", Adm(s="bt")))
         await show(target, "📐 <b>Кнопки на экранах</b>\n\nВыберите экран, чтобы поменять порядок его кнопок.", b.as_markup())
         return
     if cbd.a == "grp" and cbd.v in BUTTON_GROUPS:
+        keys = [k for k, (group, _) in BUTTONS.items() if group == cbd.v]
+        pages = max(1, (len(keys) + BT_PER_PAGE - 1) // BT_PER_PAGE)
+        page = max(0, min(cbd.p, pages - 1))
         b = InlineKeyboardBuilder()
-        for key, (group, _) in BUTTONS.items():
-            if group == cbd.v:
-                spec = settings.button(key)
-                b.row(btn(spec["text"][:60], Adm(s="bt", a="card", v=key)))
+        chunk = keys[page * BT_PER_PAGE:(page + 1) * BT_PER_PAGE]
+        for i in range(0, len(chunk), 2):
+            b.row(*[btn(strip_html(settings.button(k)["text"])[:24], Adm(s="bt", a="card", v=k)) for k in chunk[i:i + 2]])
+        pager(b, page, pages, lambda p: Adm(s="bt", a="grp", v=cbd.v, p=p))
         b.row(btn("◀️ Кнопки", Adm(s="bt")))
         await show(target, f"🔘 <b>{BUTTON_GROUPS[cbd.v]}</b>\n\nНажмите кнопку, чтобы изменить её.", b.as_markup())
         return
@@ -182,8 +202,9 @@ async def bt_view(target, session: AsyncSession, cbd: Adm) -> None:
                        "🎨 <b>Режим редактирования</b>: включите и ходите по боту как клиент. Под каждым экраном "
                        "появятся кнопки «✏️ Текст» и «🔘 Кнопки», правки видны сразу. Клиенты этих кнопок не видят.", kb(
         [edit_mode_btn(uid)],
-        [btn("🏠 Главное меню", Adm(s="bt", a="scr", v="menu")), btn("📐 Другие экраны", Adm(s="bt", a="screens"))],
-        [btn("🧩 Общие кнопки", Adm(s="bt", a="grp", v="common")), btn("🛍 Кнопки разделов", Adm(s="bt", a="grp", v="shop"))],
+        [btn("🏠 Главное меню", Adm(s="bt", a="scr", v="menu")), btn("🧩 Вкладка «Ещё»", Adm(s="bt", a="scr", v="more"))],
+        [btn("📐 Другие экраны", Adm(s="bt", a="screens")), btn("🧷 Общие кнопки", Adm(s="bt", a="grp", v="common"))],
+        [btn("🛍 Кнопки разделов", Adm(s="bt", a="grp", v="shop"))],
         [btn("◀️ Ещё", Adm(s="more"))],
     ))
 
@@ -201,7 +222,8 @@ async def screen_editor(target, screen: str) -> None:
                  btn("♻️ Сбросить", Adm(s="bt", a="layout_reset", v=screen))])
     rows.append([btn("👁 Посмотреть экран", Nav(to=nav))])
     rows.append([btn("◀️ Кнопки", Adm(s="bt"))])
-    extra = "\nТовары, валюты и листалка стоят над этими кнопками и не двигаются." if screen != "menu" else ""
+    extra = "\nТовары, валюты и листалка стоят над этими кнопками и не двигаются." if screen not in FREE else (
+        "\nКнопки можно переносить между главным меню и вкладкой «Ещё»: скройте здесь и покажите там." )
     await show(
         target,
         f"📐 <b>{name}</b>\n\nСверху кнопки в том порядке, как их видит клиент. "
@@ -225,20 +247,19 @@ async def bt_card(target, key: str, screen: str | None = None) -> None:
         "Предпросмотр 👇"
     )
     rows = [[btn(spec["text"][:60], Adm(s="bt", a="card", v=key, i=idx), icon=spec["icon"] or None, style=spec["style"] or None)]]
-    rows.append([btn("✏️ Текст", Adm(s="bt", a="text", v=key, i=idx)), btn("😀 Иконка", Adm(s="bt", a="icon", v=key, i=idx)),
-                 btn("🎨 Цвет", Adm(s="bt", a="style", v=key, i=idx))])
+    rows.append([btn("✏️ Текст", Adm(s="bt", a="text", v=key, i=idx)), btn("😀 Иконка", Adm(s="bt", a="icon", v=key, i=idx))])
+    rows.append([btn("🎨 Цвет", Adm(s="bt", a="style", v=key, i=idx)), btn("♻️ Сбросить", Adm(s="bt", a="reset", v=key, i=idx))])
     if screen:
         shown = any(key in row for row in settings.layout(screen))
         if shown:
             rows.append([btn("⬅️", Adm(s="bt", a="mv_l", v=key, i=idx)), btn("⬆️", Adm(s="bt", a="mv_u", v=key, i=idx)),
                          btn("⬇️", Adm(s="bt", a="mv_d", v=key, i=idx)), btn("➡️", Adm(s="bt", a="mv_r", v=key, i=idx))])
             line = [btn("↕️ Отдельной строкой", Adm(s="bt", a="solo", v=key, i=idx))]
-            if screen == "menu":
+            if screen in FREE:
                 line.append(btn("🙈 Скрыть", Adm(s="bt", a="hide", v=key, i=idx)))
             rows.append(line)
-        elif screen == "menu":
-            rows.append([btn("👁 Показать в меню", Adm(s="bt", a="unhide", v=key, i=idx))])
-    rows.append([btn("♻️ Сбросить кнопку", Adm(s="bt", a="reset", v=key, i=idx))])
+        elif screen in FREE:
+            rows.append([btn("👁 Показать здесь", Adm(s="bt", a="unhide", v=key, i=idx))])
     back = Adm(s="bt", a="scr", v=screen) if screen else Adm(s="bt", a="grp", v=BUTTONS[key][0])
     rows.append([btn("◀️ Назад", back)])
     await show(target, text, kb(*rows))
@@ -294,7 +315,7 @@ async def on_bt(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, st
         await answer(cb, "Режим редактирования включён: откройте любой экран бота" if on else "Режим редактирования выключен", alert=on)
         await bt_view(cb, session, Adm(s="bt"))
     elif a in ("mv_l", "mv_r", "mv_u", "mv_d", "solo", "hide", "unhide") and screen and key in _allowed(screen):
-        if a in ("hide", "unhide") and screen != "menu":
+        if a in ("hide", "unhide") and screen not in FREE:
             await bt_card(cb, key, screen)
             return
         await settings.set_layout(session, screen, _move(settings.layout(screen), key, a))
@@ -311,7 +332,7 @@ async def on_bt(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, st
     elif a == "layout" and key in SCREENS:
         legend = "\n".join(f"<code>{k}</code>: {h(strip_html(settings.button(k)['text']))}" for k in _allowed(key))
         current = "\n".join(" ".join(r) for r in settings.layout(key))
-        note = "Не указанные кнопки будут скрыты." if key == "menu" else "Не указанные кнопки встанут в конец."
+        note = "Не указанные кнопки будут скрыты." if key in FREE else "Не указанные кнопки встанут в конец."
         await ask(cb, state, "bt_layout",
                   f"📐 <b>Раскладка: {SCREENS[key][0]}</b>\n\nКаждая строка сообщения = ряд кнопок, коды через пробел. "
                   f"{note}\n\n{legend}\n\nСейчас:\n<code>{h(current)}</code>",

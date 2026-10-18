@@ -50,7 +50,7 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
     for key, (name, _) in FILTERS.items():
         mark = "• " if key == flt else ""
         b.button(text=mark + name, callback_data=Adm(s="ord", v=key))
-    b.adjust(3, 2)
+    b.adjust(2)
     for o in rows:
         icon = svc.status_icon(o.status)
         b.row(btn(f"{icon} #{o.id} · {svc.kind_plain(o.kind)} · {money(o.amount) if o.amount else 'без цены'}",
