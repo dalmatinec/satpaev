@@ -77,7 +77,7 @@ a { color: inherit; }
 .nav { position: sticky; top: 14px; z-index: 50; display: flex; align-items: center; gap: 28px;
   max-width: 1320px; width: calc(100% - 2 * var(--gutter)); margin: 14px auto 0; padding: 10px 12px 10px 18px; border-radius: 22px; }
 .brand { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; font: 700 1.25rem/1 var(--display); letter-spacing: -.01em; }
-.brand-mark { filter: drop-shadow(0 0 10px rgba(217, 70, 239, .6)); }
+.brand-mark { display: block; width: 40px; height: 40px; margin: -4px 0; }
 .nav-links { display: flex; gap: 30px; margin-left: auto; }
 .nav-links a { position: relative; text-decoration: none; color: var(--muted); font-size: .9375rem; transition: color .25s; }
 .nav-links a:hover { color: var(--ink); }
@@ -106,7 +106,7 @@ a { color: inherit; }
   padding-top: clamp(48px, 7vw, 100px); padding-bottom: 40px; }
 .eyebrow { display: flex; align-items: center; gap: 14px; margin: 0 0 22px; color: var(--muted); font-size: .75rem; letter-spacing: .28em; text-transform: uppercase; }
 .eyebrow-line { width: 34px; height: 1px; background: linear-gradient(90deg, var(--pink), transparent); }
-.hero-brand { margin: 0; font: 700 clamp(3.25rem, 7.5vw, 6.5rem)/1 var(--display); letter-spacing: -.03em;
+.hero-brand { margin: 0; font: 700 clamp(3rem, 5.4vw, 5.25rem)/1 var(--display); letter-spacing: -.03em; white-space: nowrap;
   background: linear-gradient(100deg, #e9d5ff 0%, #c4b5fd 35%, #f0abfc 70%, #e879f9); -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 0 30px rgba(192, 132, 252, .35)); }
 .hero-title { margin: 18px 0 0; font: 800 clamp(1.75rem, 3.2vw, 2.75rem)/1.12 var(--body); letter-spacing: -.02em; }
@@ -117,7 +117,7 @@ a { color: inherit; }
 .halo { position: absolute; width: 80%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, rgba(192, 38, 211, .45), rgba(124, 58, 237, .2) 40%, transparent 70%);
   will-change: transform, opacity; animation: pulse 6s ease-in-out infinite; }
 @keyframes pulse { 50% { transform: scale(1.12); opacity: .8; } }
-.cube { position: relative; width: min(78%, 330px); filter: drop-shadow(0 0 26px rgba(217, 70, 239, .75));
+.cube { position: relative; width: min(90%, 400px); height: auto;
   will-change: transform; animation: hover 7s ease-in-out infinite; }
 @keyframes hover { 50% { transform: translateY(-14px) rotate(1.5deg); } }
 .ring { position: absolute; bottom: 8%; width: 96%; filter: drop-shadow(0 0 12px rgba(217, 70, 239, .7)); }
@@ -259,7 +259,7 @@ a { color: inherit; }
 .faq p { margin: 0 0 20px; color: var(--muted); }
 
 .cta { padding: clamp(36px, 6vw, 80px); border-radius: 34px; text-align: center; overflow: hidden; }
-.cta-logo { filter: drop-shadow(0 0 20px rgba(217, 70, 239, .8)); margin-bottom: 18px; }
+.cta-logo { display: block; margin: 0 auto 14px; width: 96px; height: 96px; }
 .cta .sub { margin-left: auto; margin-right: auto; }
 .cta-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
 
@@ -286,7 +286,7 @@ a { color: inherit; }
   .nav .btn { margin-left: auto; }
   .hero { grid-template-columns: minmax(0, 1fr); }
   .hero-logo { min-height: 320px; order: -1; }
-  .cube { width: min(56%, 230px); }
+  .cube { width: min(70%, 280px); }
   .services { grid-template-columns: minmax(0, 1fr); }
   .ex, .calc, .dev { grid-template-columns: minmax(0, 1fr); }
   .steps { grid-template-columns: 1fr 1fr; }

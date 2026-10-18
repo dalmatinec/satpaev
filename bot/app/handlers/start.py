@@ -21,10 +21,11 @@ def main_kb(is_admin: bool = False):
     app_url = webapp.url()
     buttons = {}
     for key in MENU_KEYS:
-        if key == "site" and app_url:
-            buttons[key] = mbtn("site", web_app=app_url)  # откроется внутри Telegram
+        if key == "app":
+            if app_url:  # синяя кнопка: сайт как приложение внутри Telegram
+                buttons[key] = mbtn("app", web_app=app_url)
         elif key == "site" and site.startswith(("http://", "https://")):
-            buttons[key] = mbtn("site", url=site)
+            buttons[key] = mbtn("site", url=site)  # обычная ссылка: откроется в браузере
         else:
             buttons[key] = mbtn(key, Nav(to=key))
     return screen_kb("menu", buttons)

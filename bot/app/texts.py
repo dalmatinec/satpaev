@@ -306,6 +306,7 @@ BUTTONS: dict[str, tuple[str, str]] = {
     "support": ("menu", "💬 Связаться"),
     "reviews": ("menu", "⭐ Отзывы"),
     "site": ("menu", "🌐 Наш сайт"),
+    "app": ("menu", "📱 Открыть приложение"),
 
     "back": ("common", "◀️ Назад"),
     "home": ("common", "🏠 Главное меню"),
@@ -368,7 +369,9 @@ BUTTONS: dict[str, tuple[str, str]] = {
 }
 
 MENU_KEYS = [k for k, (g, _) in BUTTONS.items() if g == "menu"]
-DEFAULT_LAYOUT = [["ex", "un"], ["stars", "gifts"], ["dev"], ["ref", "support"], ["orders", "reviews"], ["site"]]
+# цвет кнопок по умолчанию (админ может поменять в 🔘 Кнопки)
+BUTTON_STYLES = {"app": "primary"}
+DEFAULT_LAYOUT = [["app"], ["ex", "un"], ["stars", "gifts"], ["dev"], ["ref", "support"], ["orders", "reviews"], ["site"]]
 
 # Экраны, где кнопки можно двигать. Ключ экрана: (название, раскладка по умолчанию, куда вернуться)
 # Динамические кнопки (товары, листалка) стоят над этими кнопками и не двигаются.

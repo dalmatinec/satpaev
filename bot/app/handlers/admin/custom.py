@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...cb import Adm, Nav
 from ...services import media, settings
-from ...texts import BUTTON_GROUPS, BUTTONS, GROUP_NAV, GROUPS, IMAGES, MENU_KEYS, SCREEN_KEYS, SCREENS, TEXTS, strip_html
+from ...texts import BUTTON_GROUPS, BUTTON_STYLES, BUTTONS, GROUP_NAV, GROUPS, IMAGES, MENU_KEYS, SCREEN_KEYS, SCREENS, TEXTS, strip_html
 from ...ui import answer, btn, kb, show
 from ...utils import h
 from .common import Ctx, ask, op, screen
@@ -329,6 +329,8 @@ async def on_bt(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, st
     elif a == "style" and key in BUTTONS:
         current = settings.button(key)["style"]
         nxt = STYLES[(STYLES.index(current) + 1) % len(STYLES)] if current in STYLES else ""
+        if not nxt and BUTTON_STYLES.get(key):
+            nxt = "none"  # у кнопки цвет по умолчанию, «обычный» нужно запомнить явно
         await settings.set_button(session, key, style=nxt)
         await session.commit()
         await bt_card(cb, key, screen)

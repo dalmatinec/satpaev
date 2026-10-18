@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import config
 from ..db.models import Setting
-from ..texts import BUTTONS, MENU_KEYS, SCREENS, TEXTS, fill
+from ..texts import BUTTON_STYLES, BUTTONS, MENU_KEYS, SCREENS, TEXTS, fill
 from ..utils import Rich, entities_from_store
 
 DEFAULTS: dict = {
@@ -154,7 +154,10 @@ def button(key: str) -> dict:
     """{'text', 'icon', 'style'} кнопки с учётом правок."""
     default = BUTTONS.get(key, ("", key))[1]
     custom = (_cache.get("buttons") or {}).get(key) or {}
-    return {"text": custom.get("text") or default, "icon": custom.get("icon") or "", "style": custom.get("style") or ""}
+    style = custom.get("style") or BUTTON_STYLES.get(key, "")
+    if style == "none":  # админ убрал цвет у кнопки, у которой он был по умолчанию
+        style = ""
+    return {"text": custom.get("text") or default, "icon": custom.get("icon") or "", "style": style}
 
 
 async def set_button(session: AsyncSession, key: str, **fields) -> None:
@@ -187,6 +190,8 @@ def layout(screen: str) -> list[list[str]]:
         seen.update(keys)
         if keys:
             clean.append(keys)
+    if screen == "menu" and "app" not in seen:  # кнопка приложения появилась позже сохранённой раскладки
+        clean.insert(0, ["app"])
     if screen != "menu":  # на служебных экранах кнопки не теряются, даже если раскладка старая
         for row in default:
             missing = [k for k in row if k not in seen]
