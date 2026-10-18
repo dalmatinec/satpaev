@@ -8,13 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import config
 from ..db.models import Setting
-from ..texts import BUTTONS, DEFAULT_LAYOUT, MENU_KEYS, TEXTS, fill
+from ..texts import BUTTONS, MENU_KEYS, SCREENS, TEXTS, fill
 from ..utils import Rich, entities_from_store
 
 DEFAULTS: dict = {
     "brand": config.brand,
-    "star_tiers": [[50, 9.5], [250, 9.2], [1000, 8.9], [5000, 8.6]],
-    "star_presets": [50, 100, 250, 500, 1000, 2500, 5000],
+    "star_tiers": [[500, 12], [1000, 11.5], [5000, 11]],
+    "star_presets": [500, 1000, 2500, 5000, 10000],
     "sla_stars": "до 3 часов",
     "sla_exchange": "от 5 до 30 минут",
     "sla_gifts": "до 3 часов",
@@ -57,6 +57,10 @@ async def load(session_maker) -> None:
         rows = (await session.execute(select(Setting))).scalars().all()
         _cache.clear()
         _cache.update({r.key: r.value for r in rows})
+
+
+def is_set(key: str) -> bool:
+    return key in _cache
 
 
 def get(key: str):
@@ -151,22 +155,57 @@ async def set_button(session: AsyncSession, key: str, **fields) -> None:
     await put(session, "buttons", buttons)
 
 
-def menu_layout() -> list[list[str]]:
-    rows = _cache.get("menu_layout")
-    if not isinstance(rows, list):
-        return [list(r) for r in DEFAULT_LAYOUT]
-    clean = []
-    seen = set()
-    for row in rows:
-        keys = [k for k in row if k in MENU_KEYS and k not in seen][:8]
+def layout(screen: str) -> list[list[str]]:
+    """Раскладка кнопок экрана с учётом правок админа."""
+    default = SCREENS[screen][1] if screen in SCREENS else []
+    allowed = {k for row in default for k in row} | (set(MENU_KEYS) if screen == "menu" else set())
+    stored = (_cache.get("layouts") or {}).get(screen)
+    if screen == "menu" and stored is None:
+        stored = _cache.get("menu_layout")  # старый ключ
+    if not isinstance(stored, list):
+        return [list(r) for r in default]
+    clean, seen = [], set()
+    for row in stored:
+        keys = [k for k in row if k in allowed and k not in seen][:8]
         seen.update(keys)
         if keys:
             clean.append(keys)
+    if screen != "menu":  # на служебных экранах кнопки не теряются, даже если раскладка старая
+        for row in default:
+            missing = [k for k in row if k not in seen]
+            if missing:
+                clean.append(missing)
+                seen.update(missing)
     return clean
 
 
-async def set_menu_layout(session: AsyncSession, rows: list[list[str]] | None) -> None:
+async def set_layout(session: AsyncSession, screen: str, rows: list[list[str]] | None) -> None:
+    layouts = dict(_cache.get("layouts") or {})
     if rows is None:
-        await reset(session, "menu_layout")
+        layouts.pop(screen, None)
+        if screen == "menu":
+            await reset(session, "menu_layout")
     else:
-        await put(session, "menu_layout", [r for r in rows if r])
+        layouts[screen] = [r for r in rows if r]
+    await put(session, "layouts", layouts)
+
+
+def menu_layout() -> list[list[str]]:
+    return layout("menu")
+
+
+async def set_menu_layout(session: AsyncSession, rows: list[list[str]] | None) -> None:
+    await set_layout(session, "menu", rows)
+
+
+# ---------------- режим редактирования ----------------
+
+def is_editing(user_id: int) -> bool:
+    return user_id in (_cache.get("edit_mode") or [])
+
+
+async def set_editing(session: AsyncSession, user_id: int, on: bool) -> None:
+    ids = [i for i in (_cache.get("edit_mode") or []) if i != user_id]
+    if on:
+        ids.append(user_id)
+    await put(session, "edit_mode", ids)

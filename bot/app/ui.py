@@ -15,7 +15,7 @@ from aiogram.types import (
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from .cb import Nav
+from .cb import Adm, Nav
 from .texts import fill
 from .utils import Rich
 
@@ -60,12 +60,35 @@ async def answer(cb: CallbackQuery, text: str | None = None, alert: bool = False
         await cb.answer(text[:200] if text else text, show_alert=alert)
 
 
+def _with_edit_row(target, kb: InlineKeyboardMarkup | None, edit: tuple[str | None, str | None] | None):
+    """В режиме редактирования админ видит под экраном кнопки правки этого экрана."""
+    if not edit:
+        return kb
+    from .services import settings
+
+    viewer = target.from_user.id if isinstance(target, CallbackQuery) else target.chat.id
+    if not settings.is_editing(viewer):
+        return kb
+    text_key, screen = edit
+    row = []
+    if text_key:
+        row.append(btn("✏️ Текст", Adm(s="live", a="tx", v=text_key)))
+    if screen:
+        row.append(btn("🔘 Кнопки", Adm(s="live", a="bt", v=screen)))
+    if not row:
+        return kb
+    rows = list(kb.inline_keyboard) if kb else []
+    return InlineKeyboardMarkup(inline_keyboard=rows + [row])
+
+
 async def show(
     target: Message | CallbackQuery,
     content: Content,
     kb: InlineKeyboardMarkup | None = None,
     photo: str | None = None,
+    edit: tuple[str | None, str | None] | None = None,
 ) -> Message | None:
+    kb = _with_edit_row(target, kb, edit)
     try:
         return await _show(target, content, kb, photo)
     except TelegramBadRequest as e:
@@ -175,3 +198,25 @@ def pager(builder: InlineKeyboardBuilder, page: int, total_pages: int, make_cb) 
     if page < total_pages - 1:
         row.append(btn("▶️", make_cb(page + 1)))
     builder.row(*row)
+
+
+def screen_kb(
+    screen: str,
+    buttons: dict[str, InlineKeyboardButton],
+    top: list[list[InlineKeyboardButton]] | None = None,
+) -> InlineKeyboardMarkup:
+    """Клавиатура экрана по раскладке из админки. buttons: доступные сейчас кнопки по ключам."""
+    from .services import settings
+
+    rows = [list(r) for r in (top or []) if r]
+    used = set()
+    for row in settings.layout(screen):
+        line = [buttons[k] for k in row if k in buttons]
+        used.update(k for k in row if k in buttons)
+        if line:
+            rows.append(line)
+    if screen != "menu":
+        extra = [b for k, b in buttons.items() if k not in used]
+        for b in extra:
+            rows.append([b])
+    return InlineKeyboardMarkup(inline_keyboard=rows)

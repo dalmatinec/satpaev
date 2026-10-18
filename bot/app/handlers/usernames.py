@@ -12,7 +12,7 @@ from ..db.models import Item, User
 from ..services import media, settings, username_check
 from ..services.orders import client_order_kb, create_order, created_text
 from ..states import BuySt, UnSt
-from ..ui import back_menu, kb, mbtn, pager, show
+from ..ui import back_menu, kb, mbtn, pager, screen_kb, show
 from ..utils import clean_username, h, money, num, round_up
 
 router = Router(name="usernames")
@@ -34,11 +34,11 @@ def _price_text(item: Item) -> str:
 
 
 async def un_view(target) -> None:
-    await show(target, t("un_screen"), kb(
-        [mbtn("un_ready", Shop(sec="un", a="list"))],
-        [mbtn("un_wish", Shop(sec="un", a="wish"))],
-        back_menu(),
-    ), photo=media.photo("un"))
+    await show(target, t("un_screen"), screen_kb("un", {
+        "un_ready": mbtn("un_ready", Shop(sec="un", a="list")),
+        "un_wish": mbtn("un_wish", Shop(sec="un", a="wish")),
+        "home": back_menu()[0],
+    }), photo=media.photo("un"), edit=("un_screen", "un"))
 
 
 @router.callback_query(Nav.filter(F.to == "un"))
@@ -100,7 +100,7 @@ async def ready_buy(cb: CallbackQuery, callback_data: Shop, session: AsyncSessio
 @router.callback_query(Shop.filter((F.sec == "un") & (F.a == "wish")))
 async def wish(cb: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(UnSt.wish)
-    await show(cb, t("un_wish"), kb([mbtn("back", Nav(to="un"))]))
+    await show(cb, t("un_wish"), kb([mbtn("back", Nav(to="un"))]), edit=("un_wish", None))
 
 
 async def check_and_confirm(message: Message, state: FSMContext, uname: str) -> None:

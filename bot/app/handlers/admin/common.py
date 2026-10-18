@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Awaitable, Callable
 
 from aiogram import Bot, F, Router
-from aiogram.filters import Filter
+from aiogram.filters import Command, Filter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy import func, select
@@ -146,9 +146,30 @@ async def cb_menu(cb: CallbackQuery, session: AsyncSession) -> None:
     await admin_menu(cb, session)
 
 
+@router.message(Command("admin"))
+async def cmd_admin(message: Message, session: AsyncSession, state: FSMContext) -> None:
+    await state.clear()
+    await admin_menu(message, session)
+
+
+@router.message(Command("edit"))
+async def cmd_edit(message: Message, session: AsyncSession, state: FSMContext) -> None:
+    await state.clear()
+    on = not settings.is_editing(message.from_user.id)
+    await settings.set_editing(session, message.from_user.id, on)
+    await session.commit()
+    if on:
+        await show(message, "🎨 <b>Режим редактирования включён</b>\n\nОткройте любой экран бота: под ним будут кнопки "
+                            "«✏️ Текст» и «🔘 Кнопки». Клиенты их не видят. Выключить: /edit", kb([btn("🏠 Открыть меню", Nav(to="menu"))]))
+    else:
+        await show(message, "Режим редактирования выключен. Включить снова: /edit")
+
+
 async def more_menu(target, session: AsyncSession, cbd: Adm | None = None) -> None:
     await show(target, "🧩 <b>Ещё</b>\n\nОформление бота и редкие настройки.", kb(
-        [btn("✏️ Тексты", Adm(s="tx")), btn("🔘 Кнопки и меню", Adm(s="bt"))],
+        [btn(("🟢" if settings.is_editing(target.from_user.id if isinstance(target, CallbackQuery) else target.chat.id) else "⚪")
+             + " Режим редактирования", Adm(s="bt", a="mode"))],
+        [btn("✏️ Тексты", Adm(s="tx")), btn("🔘 Кнопки и экраны", Adm(s="bt"))],
         [btn("🖼 Картинки", Adm(s="img")), btn("⚙️ Настройки", Adm(s="set"))],
         [btn("👥 Рефералы", Adm(s="ref")), btn("💾 Бэкапы", Adm(s="bk"))],
         [btn("◀️ Админка", Adm(s="menu"))],

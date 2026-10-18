@@ -4,35 +4,31 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..cb import Adm, Nav
+from ..cb import Nav
 from ..db.models import User
 from ..services import media, settings
-from ..texts import strip_html
-from ..ui import answer, btn, kb, mbtn, send_safe, show
+from ..texts import MENU_KEYS, strip_html
+from ..ui import answer, mbtn, screen_kb, send_safe, show
 from ..utils import clean_username, h
 
 router = Router(name="start")
 
 
-def main_kb(is_admin: bool):
+def main_kb(is_admin: bool = False):
     site = str(settings.get("site_url") or "")
-    rows = []
-    for row in settings.menu_layout():
-        buttons = []
-        for key in row:
-            if key == "site" and site.startswith(("http://", "https://")):
-                buttons.append(mbtn("site", url=site))
-            else:
-                buttons.append(mbtn(key, Nav(to=key)))
-        rows.append(buttons)
-    if is_admin:
-        rows.append([btn("⚙️ Админка", Adm(s="menu"))])
-    return kb(*rows)
+    buttons = {}
+    for key in MENU_KEYS:
+        if key == "site" and site.startswith(("http://", "https://")):
+            buttons[key] = mbtn("site", url=site)
+        else:
+            buttons[key] = mbtn(key, Nav(to=key))
+    return screen_kb("menu", buttons)
 
 
 async def show_menu(target, user: User | None, is_admin: bool) -> None:
     name = h(user.full_name.split()[0]) if user and user.full_name else ""
-    await show(target, settings.t("welcome", name=name), main_kb(is_admin), photo=media.photo("welcome"))
+    await show(target, settings.t("welcome", name=name), main_kb(is_admin), photo=media.photo("welcome"),
+               edit=("welcome", "menu"))
 
 
 async def deep_link(payload: str, message: Message, state: FSMContext, session: AsyncSession, user: User) -> bool:

@@ -16,7 +16,7 @@ from ..db.models import SupportLink, User
 from ..services import media, settings, workhours
 from ..services.orders import tag_name
 from ..states import SupportSt
-from ..ui import btn, kb, mbtn, show
+from ..ui import btn, kb, mbtn, screen_kb, show
 from ..utils import h
 
 log = logging.getLogger(__name__)
@@ -28,8 +28,8 @@ _last_after_hours: dict[int, float] = {}
 
 async def support_view(target, state: FSMContext) -> None:
     await state.set_state(SupportSt.chat)
-    await show(target, settings.t("support_screen"), kb([mbtn("finish_chat", Nav(to="menu"))]),
-               photo=media.photo("support"))
+    await show(target, settings.t("support_screen"), screen_kb("support", {"finish_chat": mbtn("finish_chat", Nav(to="menu"))}),
+               photo=media.photo("support"), edit=("support_screen", "support"))
 
 
 @router.callback_query(Nav.filter(F.to == "support"))
@@ -105,7 +105,7 @@ async def support_message(message: Message, user: User, session: AsyncSession, i
 async def fallback(message: Message, user: User, session: AsyncSession, is_admin: bool) -> None:
     """Любое сообщение вне сценариев уходит менеджеру."""
     if is_admin:
-        await message.answer("ℹ️ Чтобы ответить клиенту, сделайте реплай на его сообщение.\nАдминка: /start → ⚙️ Админка")
+        await message.answer("ℹ️ Чтобы ответить клиенту, сделайте реплай на его сообщение.\nАдминка: /admin, режим редактирования: /edit")
         return
     if message.text and message.text.startswith("/"):
         await message.answer(settings.t("unknown_cmd"))

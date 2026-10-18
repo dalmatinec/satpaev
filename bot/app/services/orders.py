@@ -10,7 +10,7 @@ from ..cb import Adm, Nav, Shop
 from ..config import config
 from ..db.models import Item, Order, RefAccrual, Reminder, User
 from ..texts import strip_html
-from ..ui import btn, kb, mbtn, send_safe
+from ..ui import btn, kb, mbtn, screen_kb, send_safe
 from ..utils import fdate, h, money, utcnow
 from . import settings, workhours
 
@@ -146,17 +146,17 @@ def admin_order_kb(order: Order):
 
 
 def client_order_kb(order: Order):
-    rows = []
+    buttons = {
+        "write_manager": mbtn("write_manager", Nav(to="support")),
+        "my_orders": mbtn("my_orders", Nav(to="orders")),
+        "home_short": mbtn("home_short", Nav(to="menu")),
+    }
     if order.status == "wait_pay":
-        rows.append([mbtn("paid", Shop(sec="ord", a="paid", i=order.id))])
+        buttons["paid"] = mbtn("paid", Shop(sec="ord", a="paid", i=order.id))
     if order.status == "quote":
-        rows.append([
-            mbtn("agree", Shop(sec="ord", a="agree", i=order.id)),
-            mbtn("decline", Shop(sec="ord", a="decline", i=order.id)),
-        ])
-    rows.append([mbtn("write_manager", Nav(to="support"))])
-    rows.append([mbtn("my_orders", Nav(to="orders")), mbtn("home_short", Nav(to="menu"))])
-    return kb(*rows)
+        buttons["agree"] = mbtn("agree", Shop(sec="ord", a="agree", i=order.id))
+        buttons["decline"] = mbtn("decline", Shop(sec="ord", a="decline", i=order.id))
+    return screen_kb("order", buttons)
 
 
 async def notify_admins(bot: Bot, text: str, markup=None) -> None:

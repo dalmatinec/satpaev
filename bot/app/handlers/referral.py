@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..cb import Nav
 from ..db.models import RefAccrual, User
 from ..services import media, settings
-from ..ui import back_menu, kb, mbtn, show
+from ..ui import back_menu, mbtn, screen_kb, show
 from ..utils import money, num
 
 router = Router(name="referral")
@@ -33,11 +33,11 @@ async def ref_view(target, session: AsyncSession, user: User) -> None:
         pending=money(sums.get(False, 0)),
     )
     share = "https://t.me/share/url?url=" + quote(link, safe="")
-    await show(target, text, kb(
-        [mbtn("ref_share", url=share)],
-        [mbtn("ref_payout", Nav(to="support"))],
-        back_menu(),
-    ), photo=media.photo("ref"))
+    await show(target, text, screen_kb("ref", {
+        "ref_share": mbtn("ref_share", url=share),
+        "ref_payout": mbtn("ref_payout", Nav(to="support")),
+        "home": back_menu()[0],
+    }), photo=media.photo("ref"), edit=("ref_screen", "ref"))
 
 
 @router.callback_query(Nav.filter(F.to == "ref"))

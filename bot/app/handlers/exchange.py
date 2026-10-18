@@ -12,7 +12,7 @@ from ..db.models import Rate, User
 from ..services import media, settings
 from ..services.orders import client_order_kb, create_order, created_text
 from ..states import ExSt
-from ..ui import back_menu, kb, mbtn, show
+from ..ui import back_menu, kb, mbtn, screen_kb, show
 from ..utils import h, is_tenge_input, money, num, parse_number, round_up
 
 router = Router(name="exchange")
@@ -34,16 +34,18 @@ async def ex_view(target, session: AsyncSession) -> None:
     )).scalars().all()
     rates = [r for r in rates if r.buy or r.sell]
     if not rates:
-        await show(target, t("ex_empty"), kb([mbtn("write_manager", Nav(to="support"))], back_menu()),
-                   photo=media.photo("ex"))
+        await show(target, t("ex_empty"), screen_kb("ex", {
+            "write_manager": mbtn("write_manager", Nav(to="support")), "home": back_menu()[0]}),
+            photo=media.photo("ex"), edit=("ex_empty", "ex"))
         return
     text = t("ex_screen", rates="\n".join(rate_line(r) for r in rates), sla=h(settings.get("sla_exchange")))
     b = InlineKeyboardBuilder()
     for r in rates:
         b.button(text=r.code, callback_data=Shop(sec="ex", a="pair", i=r.id))
     b.adjust(3)
-    b.row(*back_menu())
-    await show(target, text, b.as_markup(), photo=media.photo("ex"))
+    markup = screen_kb("ex", {"write_manager": mbtn("write_manager", Nav(to="support")), "home": back_menu()[0]},
+                       top=b.as_markup().inline_keyboard)
+    await show(target, text, markup, photo=media.photo("ex"), edit=("ex_screen", "ex"))
 
 
 @router.callback_query(Nav.filter(F.to == "ex"))
@@ -63,7 +65,7 @@ async def pair(cb: CallbackQuery, callback_data: Shop, session: AsyncSession) ->
     if r.buy:
         rows.append([mbtn("ex_sell", Shop(sec="ex", a="dir", i=r.id, v="sell"), code=r.code, rate=num(r.buy))])
     rows.append([mbtn("back", Nav(to="ex"))])
-    await show(cb, t("ex_pair", code=h(r.code), line=rate_line(r)), kb(*rows))
+    await show(cb, t("ex_pair", code=h(r.code), line=rate_line(r)), kb(*rows), edit=("ex_pair", None))
 
 
 @router.callback_query(Shop.filter((F.sec == "ex") & (F.a == "dir")))
@@ -77,7 +79,7 @@ async def direction(cb: CallbackQuery, callback_data: Shop, session: AsyncSessio
     verb = "купить" if callback_data.v == "buy" else "продать"
     min_txt = f"\nМинимум: {num(r.min_qty)} {h(r.code)}" if r.min_qty else ""
     await show(cb, t("ex_amount", code=h(r.code), verb=verb, min=min_txt),
-               kb([mbtn("back", Shop(sec="ex", a="pair", i=r.id))]))
+               kb([mbtn("back", Shop(sec="ex", a="pair", i=r.id))]), edit=("ex_amount", None))
 
 
 @router.message(ExSt.amount)
@@ -110,6 +112,7 @@ async def amount_input(message: Message, state: FSMContext, session: AsyncSessio
         message,
         t(key, qty=num(qty), code=h(r.code), kzt=money(kzt), rate=num(rate), sla=h(settings.get("sla_exchange"))),
         kb([mbtn("confirm", In(a="ex_ok"))], [mbtn("change", Shop(sec="ex", a="pair", i=r.id))]),
+        edit=(key, None),
     )
 
 

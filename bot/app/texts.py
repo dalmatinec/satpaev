@@ -295,10 +295,46 @@ BUTTONS: dict[str, tuple[str, str]] = {
     "ref_share": ("shop", "📤 Поделиться ссылкой"),
     "ref_payout": ("shop", "💬 Запросить выплату"),
     "reviews_channel": ("shop", "📢 Все отзывы в канале"),
+
+    "cat_bots": ("shop", "🤖 Telegram боты"),
+    "cat_sites": ("shop", "🌐 Сайты"),
+    "cat_miniapp": ("shop", "📱 Mini App"),
+    "cat_servers": ("shop", "🖥 Сервера и DevOps"),
+    "cat_other": ("shop", "🧩 Другое"),
+    "budget_0": ("shop", "до 50 000 ₸"),
+    "budget_1": ("shop", "50 000 - 150 000 ₸"),
+    "budget_2": ("shop", "150 000 - 500 000 ₸"),
+    "budget_3": ("shop", "от 500 000 ₸"),
+    "budget_4": ("shop", "Пока не знаю"),
+    "deadline_0": ("shop", "Срочно"),
+    "deadline_1": ("shop", "1-2 недели"),
+    "deadline_2": ("shop", "До месяца"),
+    "deadline_3": ("shop", "Не горит"),
 }
 
 MENU_KEYS = [k for k, (g, _) in BUTTONS.items() if g == "menu"]
-DEFAULT_LAYOUT = [["stars", "gifts"], ["un", "ex"], ["dev"], ["orders", "ref"], ["support", "reviews"], ["site"]]
+DEFAULT_LAYOUT = [["ex", "un"], ["stars", "gifts"], ["dev"], ["ref", "support"], ["orders", "reviews"], ["site"]]
+
+# Экраны, где кнопки можно двигать. Ключ экрана: (название, раскладка по умолчанию, куда вернуться)
+# Динамические кнопки (товары, листалка) стоят над этими кнопками и не двигаются.
+SCREENS: dict[str, tuple[str, list[list[str]], str]] = {
+    "menu": ("🏠 Главное меню", DEFAULT_LAYOUT, "menu"),
+    "ex": ("💱 Обмен", [["write_manager"], ["home"]], "ex"),
+    "un": ("💎 Юзернеймы", [["un_ready"], ["un_wish"], ["home"]], "un"),
+    "stars": ("⭐ Звёзды", [["stars_custom"], ["home"]], "stars"),
+    "gift": ("🎁 Подарок", [["buy"], ["gift_view"], ["write_manager"], ["home"]], "gifts"),
+    "dev": ("🛠 Разработка", [["cat_bots", "cat_sites"], ["cat_miniapp", "cat_servers"], ["cat_other"],
+                             ["dev_pf"], ["dev_order"], ["home"]], "dev"),
+    "ref": ("👥 Рефералы", [["ref_share"], ["ref_payout"], ["home"]], "ref"),
+    "order": ("📦 Карточка заказа", [["paid"], ["agree", "decline"], ["write_manager"], ["my_orders", "home_short"]], "orders"),
+    "support": ("💬 Связь", [["finish_chat"]], "support"),
+    "reviews": ("⭐ Отзывы", [["reviews_channel"], ["home"]], "reviews"),
+}
+SCREEN_KEYS = list(SCREENS)
+
+# раздел текстов: экран, куда вернуться после правки
+GROUP_NAV = {"main": "menu", "stars": "stars", "gifts": "gifts", "un": "un", "ex": "ex", "dev": "dev",
+             "orders": "orders", "support": "support", "ref": "ref", "reviews": "reviews", "names": "orders"}
 
 # ---------- картинки разделов ----------
 

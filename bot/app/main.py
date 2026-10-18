@@ -7,7 +7,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ChatType, ParseMode
 from aiogram.fsm.storage.base import BaseStorage
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import BotCommand, ErrorEvent
+from aiogram.types import BotCommand, BotCommandScopeChat, ErrorEvent
 
 from .config import config
 from .db import init_db
@@ -58,6 +58,16 @@ async def main() -> None:
     dp.errors.register(on_error)
 
     await bot.set_my_commands([BotCommand(command="start", description="Главное меню")])
+    for admin_id in config.admin_ids:  # /admin и /edit видны только админам
+        try:
+            await bot.set_my_commands(
+                [BotCommand(command="start", description="Главное меню"),
+                 BotCommand(command="admin", description="Админка"),
+                 BotCommand(command="edit", description="Режим редактирования вкл/выкл")],
+                scope=BotCommandScopeChat(chat_id=admin_id),
+            )
+        except Exception as e:
+            log.warning("Не удалось задать команды для %s: %s", admin_id, e)
     await media.verify(bot, sm)
     tick = asyncio.create_task(scheduler.run(bot, sm))
     me = await bot.me()

@@ -9,7 +9,7 @@ from ..db.models import Item, User
 from ..services import settings
 from ..services.orders import client_order_kb, create_order, created_text
 from ..states import BuySt
-from ..ui import back_menu, btn, kb, mbtn, show
+from ..ui import back_menu, btn, kb, mbtn, screen_kb, show
 from ..utils import h, money
 
 router = Router(name="gifts")
@@ -24,7 +24,9 @@ async def gift_page(target, session: AsyncSession, page: int) -> None:
     base = (Item.kind == "gift") & Item.is_active.is_(True)
     total = await session.scalar(select(func.count(Item.id)).where(base)) or 0
     if total == 0:
-        await show(target, t("gifts_empty"), kb([mbtn("write_manager", Nav(to="support"))], back_menu()))
+        await show(target, t("gifts_empty"), screen_kb("gift", {
+            "write_manager": mbtn("write_manager", Nav(to="support")), "home": back_menu()[0]}),
+            edit=("gifts_empty", "gift"))
         return
     page = max(0, min(page, total - 1))
     item = (await session.execute(
@@ -32,18 +34,18 @@ async def gift_page(target, session: AsyncSession, page: int) -> None:
     )).scalar_one()
     desc = f"\n{h(item.description)}\n" if item.description else ""
     text = t("gift_card", title=h(item.title), description=desc, price=_price(item), sla=h(settings.get("sla_gifts")))
-    rows = []
+    top = []
     if total > 1:
-        rows.append([
+        top.append([
             btn("◀️", Shop(sec="gift", a="page", p=(page - 1) % total)),
             btn(f"{page + 1} из {total}", Shop(sec="gift", a="page", p=page)),
             btn("▶️", Shop(sec="gift", a="page", p=(page + 1) % total)),
         ])
-    rows.append([mbtn("buy", Shop(sec="gift", a="buy", i=item.id))])
+    buttons = {"buy": mbtn("buy", Shop(sec="gift", a="buy", i=item.id)),
+               "write_manager": mbtn("write_manager", Nav(to="support")), "home": back_menu()[0]}
     if item.link.startswith("http"):
-        rows.append([mbtn("gift_view", url=item.link)])
-    rows.append(back_menu())
-    await show(target, text, kb(*rows), photo=item.photo or None)
+        buttons["gift_view"] = mbtn("gift_view", url=item.link)
+    await show(target, text, screen_kb("gift", buttons, top=top), photo=item.photo or None, edit=("gift_card", "gift"))
 
 
 @router.callback_query(Nav.filter(F.to == "gifts"))
@@ -68,6 +70,7 @@ async def gift_buy(cb: CallbackQuery, callback_data: Shop, session: AsyncSession
         cb,
         t("gift_confirm", title=h(item.title), price=_price(item)),
         kb([mbtn("confirm", In(a="buy_ok"))], [mbtn("back", Nav(to="gifts"))]),
+        edit=("gift_confirm", None),
     )
 
 

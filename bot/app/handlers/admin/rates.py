@@ -204,7 +204,8 @@ async def stars_view(target, session: AsyncSession, cbd: Adm) -> None:
         f"<b>Кнопки количества:</b> {h(presets)}\n"
         f"<b>Выдача звёзд:</b> {h(settings.get('sla_stars'))}\n"
         f"<b>Срок обмена:</b> {h(settings.get('sla_exchange'))}\n"
-        f"<b>Передача подарков:</b> {h(settings.get('sla_gifts'))}",
+        f"<b>Передача подарков:</b> {h(settings.get('sla_gifts'))}"
+        + ("" if settings.is_set("star_tiers") else "\n\n⚠️ <b>Сейчас стоят цены по умолчанию.</b> Нажмите «Сетка цен» и задайте свои."),
         kb(
             [btn("✏️ Сетка цен", Adm(s="stars", a="tiers")), btn("✏️ Кнопки", Adm(s="stars", a="presets"))],
             [btn("⏱ Срок звёзд", Adm(s="stars", a="sla", v="sla_stars")),
@@ -221,7 +222,7 @@ async def on_stars(cb: CallbackQuery, callback_data: Adm, session: AsyncSession,
     if callback_data.a == "tiers":
         await ask(cb, state, "star_tiers",
                   "✏️ Пришлите сетку: каждая строка «от скольки штук» и «цена за звезду».\n\n"
-                  "Пример:\n<code>50 9.5\n250 9.2\n1000 8.9\n5000 8.6</code>\n\nПервая строка задаёт минимальный заказ.",
+                  "Пример:\n<code>500 12\n1000 11.5\n5000 11</code>\n\nПервая строка задаёт минимальный заказ.",
                   back)
     elif callback_data.a == "presets":
         await ask(cb, state, "star_presets", "✏️ Пришлите количества для кнопок через пробел:\n<code>50 100 250 500 1000 2500 5000</code>", back)

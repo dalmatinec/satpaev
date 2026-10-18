@@ -11,11 +11,16 @@ from ..db.models import Item, User
 from ..services import media, settings
 from ..services.orders import client_order_kb, create_order, created_text
 from ..states import DevSt
-from ..ui import back_menu, btn, kb, mbtn, show
+from ..texts import strip_html
+from ..ui import back_menu, btn, kb, mbtn, screen_kb, show
 from ..utils import h
 
 router = Router(name="dev")
 t = settings.t
+
+def _label(key: str) -> str:
+    return strip_html(settings.button(key)["text"])
+
 
 ACTIVE_SERVICE = (Item.kind == "service") & Item.is_active.is_(True)
 
@@ -24,15 +29,13 @@ async def dev_view(target, session: AsyncSession) -> None:
     counts = dict((await session.execute(
         select(Item.category, func.count(Item.id)).where(ACTIVE_SERVICE).group_by(Item.category)
     )).all())
-    b = InlineKeyboardBuilder()
-    for key, name in DEV_CATS.items():
-        if counts.get(key):
-            b.button(text=name, callback_data=Shop(sec="dev", a="cat", v=key))
-    b.adjust(2)
-    b.row(mbtn("dev_pf", Shop(sec="dev", a="pf")))
-    b.row(mbtn("dev_order", Shop(sec="dev", a="order")))
-    b.row(*back_menu())
-    await show(target, t("dev_screen"), b.as_markup(), photo=media.photo("dev"))
+    buttons = {f"cat_{key}": mbtn(f"cat_{key}", Shop(sec="dev", a="cat", v=key)) for key in DEV_CATS if counts.get(key)}
+    buttons.update({
+        "dev_pf": mbtn("dev_pf", Shop(sec="dev", a="pf")),
+        "dev_order": mbtn("dev_order", Shop(sec="dev", a="order")),
+        "home": back_menu()[0],
+    })
+    await show(target, t("dev_screen"), screen_kb("dev", buttons), photo=media.photo("dev"), edit=("dev_screen", "dev"))
 
 
 @router.callback_query(Nav.filter(F.to == "dev"))
@@ -45,7 +48,7 @@ async def category(cb: CallbackQuery, callback_data: Shop, session: AsyncSession
     items = (await session.execute(
         select(Item).where(ACTIVE_SERVICE, Item.category == callback_data.v).order_by(Item.sort, Item.id).limit(30)
     )).scalars().all()
-    name = DEV_CATS.get(callback_data.v, "Услуги")
+    name = h(settings.button(f"cat_{callback_data.v}")["text"]) if callback_data.v in DEV_CATS else "Услуги"
     lines = [f"▫️ <b>{h(it.title)}</b>\n{h(it.price_text)}" for it in items]
     b = InlineKeyboardBuilder()
     for it in items:
@@ -105,7 +108,7 @@ async def brief_start(cb: CallbackQuery, callback_data: Shop, session: AsyncSess
     await state.set_state(DevSt.task)
     await state.update_data(service=service_title)
     head = f"Услуга: <b>{h(service_title)}</b>\n\n" if service_title else ""
-    await show(cb, t("dev_step1", service=head), kb([mbtn("cancel", Nav(to="dev"))]))
+    await show(cb, t("dev_step1", service=head), kb([mbtn("cancel", Nav(to="dev"))]), edit=("dev_step1", None))
 
 
 @router.message(DevSt.task)
@@ -116,26 +119,20 @@ async def brief_task(message: Message, state: FSMContext) -> None:
         return
     await state.update_data(task=text[:2000])
     await state.set_state(DevSt.budget)
-    b = InlineKeyboardBuilder()
-    for i, v in enumerate(BUDGETS):
-        b.button(text=v, callback_data=In(a="dev_b", v=str(i)))
-    b.adjust(1)
-    await show(message, t("dev_step2"), b.as_markup())
+    rows = [[mbtn(f"budget_{i}", In(a="dev_b", v=str(i)))] for i in range(len(BUDGETS))]
+    await show(message, t("dev_step2"), kb(*rows), edit=("dev_step2", None))
 
 
 async def _ask_deadline(target, state: FSMContext, budget: str) -> None:
     await state.update_data(budget=budget)
     await state.set_state(DevSt.deadline)
-    b = InlineKeyboardBuilder()
-    for i, v in enumerate(DEADLINES):
-        b.button(text=v, callback_data=In(a="dev_d", v=str(i)))
-    b.adjust(2)
-    await show(target, t("dev_step3"), b.as_markup())
+    keys = [mbtn(f"deadline_{i}", In(a="dev_d", v=str(i))) for i in range(len(DEADLINES))]
+    await show(target, t("dev_step3"), kb(*[keys[i:i + 2] for i in range(0, len(keys), 2)]), edit=("dev_step3", None))
 
 
 @router.callback_query(DevSt.budget, In.filter(F.a == "dev_b"))
 async def brief_budget_btn(cb: CallbackQuery, callback_data: In, state: FSMContext) -> None:
-    await _ask_deadline(cb, state, BUDGETS[int(callback_data.v) % len(BUDGETS)])
+    await _ask_deadline(cb, state, _label(f"budget_{int(callback_data.v) % len(BUDGETS)}"))
 
 
 @router.message(DevSt.budget)
@@ -152,12 +149,13 @@ async def _confirm(target, state: FSMContext, deadline: str) -> None:
         target,
         t("dev_confirm", service=service, task=h(d.get("task")), budget=h(d.get("budget")), deadline=h(deadline)),
         kb([mbtn("dev_send", In(a="dev_ok"))], [mbtn("cancel", Nav(to="dev"))]),
+        edit=("dev_confirm", None),
     )
 
 
 @router.callback_query(DevSt.deadline, In.filter(F.a == "dev_d"))
 async def brief_deadline_btn(cb: CallbackQuery, callback_data: In, state: FSMContext) -> None:
-    await _confirm(cb, state, DEADLINES[int(callback_data.v) % len(DEADLINES)])
+    await _confirm(cb, state, _label(f"deadline_{int(callback_data.v) % len(DEADLINES)}"))
 
 
 @router.message(DevSt.deadline)

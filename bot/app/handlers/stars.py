@@ -11,7 +11,7 @@ from ..db.models import User
 from ..services import media, settings
 from ..services.orders import client_order_kb, create_order, created_text
 from ..states import StarsSt
-from ..ui import back_menu, kb, mbtn, show
+from ..ui import back_menu, kb, mbtn, screen_kb, show
 from ..utils import clean_username, h, money, num, round_up
 
 router = Router(name="stars")
@@ -44,9 +44,9 @@ async def stars_view(target) -> None:
         _, total = price_for(q)
         b.button(text=f"{num(q)} ⭐ · {money(total)}", callback_data=Shop(sec="stars", a="qty", v=str(q)))
     b.adjust(2)
-    b.row(mbtn("stars_custom", Shop(sec="stars", a="custom")))
-    b.row(*back_menu())
-    await show(target, text, b.as_markup(), photo=media.photo("stars"))
+    markup = screen_kb("stars", {"stars_custom": mbtn("stars_custom", Shop(sec="stars", a="custom")),
+                                 "home": back_menu()[0]}, top=b.as_markup().inline_keyboard)
+    await show(target, text, markup, photo=media.photo("stars"), edit=("stars_screen", "stars"))
 
 
 @router.callback_query(Nav.filter(F.to == "stars"))
@@ -62,7 +62,7 @@ async def ask_recipient(target, state: FSMContext, user: User, qty: int) -> None
     if user.username:
         rows.append([mbtn("stars_me", In(a="st_me"), username=user.username)])
     rows.append([mbtn("back", Nav(to="stars"))])
-    await show(target, t("stars_recipient", qty=num(qty), total=money(total)), kb(*rows))
+    await show(target, t("stars_recipient", qty=num(qty), total=money(total)), kb(*rows), edit=("stars_recipient", None))
 
 
 @router.callback_query(Shop.filter((F.sec == "stars") & (F.a == "qty")))
@@ -73,7 +73,7 @@ async def pick_qty(cb: CallbackQuery, callback_data: Shop, state: FSMContext, us
 @router.callback_query(Shop.filter((F.sec == "stars") & (F.a == "custom")))
 async def custom_qty(cb: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(StarsSt.qty)
-    await show(cb, t("stars_custom", min=num(min_qty())), kb([mbtn("back", Nav(to="stars"))]))
+    await show(cb, t("stars_custom", min=num(min_qty())), kb([mbtn("back", Nav(to="stars"))]), edit=("stars_custom", None))
 
 
 @router.message(StarsSt.qty)
@@ -96,6 +96,7 @@ async def confirm(target, state: FSMContext, recipient: str) -> None:
         t("stars_confirm", qty=num(qty), recipient=h(recipient), unit=num(unit), total=money(total),
           sla=h(settings.get("sla_stars"))),
         kb([mbtn("confirm", In(a="st_ok"))], [mbtn("change", Nav(to="stars"))]),
+        edit=("stars_confirm", None),
     )
 
 

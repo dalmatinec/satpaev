@@ -18,7 +18,7 @@ from ..services.orders import (
     status_icon,
 )
 from ..states import ReviewSt
-from ..ui import back_menu, btn, kb, mbtn, pager, show
+from ..ui import back_menu, btn, kb, mbtn, pager, screen_kb, show
 from ..utils import h, money
 
 router = Router(name="my_orders")
@@ -29,7 +29,7 @@ t = settings.t
 async def orders_view(target, session: AsyncSession, user: User, page: int) -> None:
     total = await session.scalar(select(func.count(Order.id)).where(Order.user_id == user.id)) or 0
     if total == 0:
-        await show(target, t("orders_empty"), kb(back_menu()))
+        await show(target, t("orders_empty"), kb(back_menu()), edit=("orders_empty", None))
         return
     pages = (total + PER_PAGE - 1) // PER_PAGE
     page = max(0, min(page, pages - 1))
@@ -44,7 +44,7 @@ async def orders_view(target, session: AsyncSession, user: User, page: int) -> N
     b.adjust(1)
     pager(b, page, pages, lambda p: Nav(to="orders", p=p))
     b.row(*back_menu())
-    await show(target, t("orders_list", total=total), b.as_markup())
+    await show(target, t("orders_list", total=total), b.as_markup(), edit=("orders_list", None))
 
 
 @router.callback_query(Nav.filter(F.to == "orders"))
@@ -65,7 +65,7 @@ async def order_card(cb: CallbackQuery, callback_data: Shop, session: AsyncSessi
     if not order:
         await show(cb, t("order_not_found"), kb(back_menu()))
         return
-    await show(cb, client_card(order), client_order_kb(order))
+    await show(cb, client_card(order), client_order_kb(order), edit=(None, "order"))
 
 
 def _admin_open(order: Order):
@@ -161,9 +161,9 @@ async def nav_reviews(cb: CallbackQuery, session: AsyncSession) -> None:
     items = "".join(f"{'⭐' * r.rating}\n«{h(r.text[:300])}»\n\n" for r in last)
     if not count:
         items = t("reviews_empty")
-    rows = []
+    buttons = {"home": back_menu()[0]}
     link = str(settings.get("reviews_link") or "")
     if link.startswith("http"):
-        rows.append([mbtn("reviews_channel", url=link)])
-    rows.append(back_menu())
-    await show(cb, t("reviews_screen", stats=stats, list=items).strip(), kb(*rows))
+        buttons["reviews_channel"] = mbtn("reviews_channel", url=link)
+    await show(cb, t("reviews_screen", stats=stats, list=items).strip(), screen_kb("reviews", buttons),
+               edit=("reviews_screen", "reviews"))
