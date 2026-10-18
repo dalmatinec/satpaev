@@ -8,7 +8,7 @@
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
-		Content-Security-Policy "default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self' https://web.telegram.org https://*.telegram.org"
+		Content-Security-Policy "default-src 'self'; script-src 'self' https://telegram.org; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self' https://web.telegram.org https://*.telegram.org"
 	}
 
 	# API бота (только чтение)
@@ -23,7 +23,7 @@
 	handle {
 		@html path / /index.html
 		header @html Cache-Control "no-cache"
-		@static path *.css *.js *.svg *.png *.jpg *.webp *.woff2
+		@static path *.css *.js *.svg *.png *.jpg *.webp *.woff *.woff2
 		header @static Cache-Control "public, max-age=2592000, immutable"
 		file_server
 	}

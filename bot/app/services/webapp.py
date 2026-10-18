@@ -18,14 +18,18 @@ def url() -> str:
     return ""
 
 
-async def apply(bot: Bot) -> str:
-    """Ставит или убирает кнопку меню у всех пользователей. Возвращает пустую строку или текст ошибки."""
+async def apply(bot: Bot, reset: bool = False) -> str:
+    """Ставит кнопку Web App у поля ввода. Возвращает пустую строку или текст ошибки.
+
+    Если ссылки нет, кнопку не трогаем: её могли поставить в @BotFather.
+    reset=True (админ выключил Web App или убрал ссылку) возвращает обычное меню команд.
+    """
     link = url()
     try:
         if link:
             text = (str(settings.get("webapp_menu_text") or "").strip() or "Открыть")[:32]
             await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text=text, web_app=WebAppInfo(url=link)))
-        else:
+        elif reset:
             await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
         return ""
     except Exception as e:  # сеть или Telegram отклонил ссылку

@@ -366,7 +366,7 @@ async def op_set_url(ctx: Ctx) -> None:
     if ctx.message is None:
         await settings.put(ctx.session, ctx.data["key"], "")
         if ctx.data["key"] == "site_url":
-            await webapp.apply(ctx.bot)
+            await webapp.apply(ctx.bot, reset=True)
         await _back(ctx)
         return
     value = (ctx.text or "").strip()

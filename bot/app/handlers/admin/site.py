@@ -76,7 +76,7 @@ async def on_web(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, s
         await settings.put(session, "webapp_enabled", not settings.get("webapp_enabled"))
         await session.commit()
     if a in ("toggle", "apply"):
-        err = await webapp.apply(cb.bot)
+        err = await webapp.apply(cb.bot, reset=a == "toggle")
         note = f"⚠️ Telegram не принял кнопку: {h(err)}" if err else "✅ Кнопка обновлена. Если не видно, перезайдите в чат с ботом."
     await answer(cb)
     await web_view(cb, session, back, note)
