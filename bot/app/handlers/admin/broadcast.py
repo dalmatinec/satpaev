@@ -173,3 +173,12 @@ async def run(bot: Bot, sm, seg: str, from_chat: int, msg_id: int, admin_id: int
                                reply_markup=kb([btn("⚙️ Админка", Adm(s="menu"))]))
     except (TelegramBadRequest, TelegramForbiddenError):
         pass
+
+
+def start(bot: Bot, sm, seg: str, from_chat: int, msg_id: int, admin_id: int) -> bool:
+    """Запуск рассылки из другого раздела (например, курсы). False, если уже идёт другая."""
+    if _running["task"] is not None and not _running["task"].done():
+        return False
+    _running["stop"] = False
+    _running["task"] = asyncio.create_task(run(bot, sm, seg, from_chat, msg_id, admin_id, None))
+    return True

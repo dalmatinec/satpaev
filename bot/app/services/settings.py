@@ -32,6 +32,7 @@ DEFAULTS: dict = {
     "reviews_link": "",
     "site_url": config.site_url,
     "webapp_enabled": True,
+    "menu_kb_enabled": True,
     "webapp_menu_text": "Открыть",
     "post_mode": "account" if config.poster_enabled else "bot",
     "backup_time": config.backup_time,

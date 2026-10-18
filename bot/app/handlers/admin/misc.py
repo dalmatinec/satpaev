@@ -279,7 +279,8 @@ async def set_view(target, session: AsyncSession, cbd: Adm) -> None:
         f"🔨 Длительность аукциона: <b>{num(settings.get('uname_auction_days'))} дн.</b>\n"
         f"📢 Канал: {h(settings.get('channel_link') or 'нет')}\n"
         f"📝 Отзывы: {h(settings.get('reviews_link') or 'нет')}\n"
-        f"🌐 Сайт: {h(site)}\n\n"
+        f"🌐 Сайт: {h(site)}\n"
+        f"⌨️ Кнопка «Главное меню» под полем ввода: <b>{_onoff(settings.get('menu_kb_enabled'))}</b>\n\n"
         "Тексты, кнопки и картинки меняются в «🧩 Ещё»."
     )
     await show(target, text, kb(
@@ -291,7 +292,8 @@ async def set_view(target, session: AsyncSession, cbd: Adm) -> None:
          btn("🔨 Дни", Adm(s="set", a="num", v="uname_auction_days"))],
         [btn("📢 Ссылка канала", Adm(s="set", a="url", v="channel_link")),
          btn("📝 Ссылка отзывов", Adm(s="set", a="url", v="reviews_link"))],
-        [btn("🌐 Ссылка сайта", Adm(s="set", a="url", v="site_url"))],
+        [btn("🌐 Ссылка сайта", Adm(s="set", a="url", v="site_url")),
+         btn(f"⌨️ Кнопка меню: {_onoff(settings.get('menu_kb_enabled'))}", Adm(s="set", a="menukb"))],
         [btn("◀️ Ещё", Adm(s="more"))],
     ))
 
@@ -310,6 +312,11 @@ async def on_set(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, s
     back = Adm(s="set")
     if a == "brand":
         await ask(cb, state, "set_text", "🏷 Введите название магазина:", back, key="brand")
+    elif a == "menukb":
+        await settings.put(session, "menu_kb_enabled", not settings.get("menu_kb_enabled"))
+        await session.commit()
+        await answer(cb, "Клиенты увидят изменение при следующем входе в меню", alert=True)
+        await set_view(cb, session, back)
     elif a == "work":
         await settings.put(session, "work_enabled", not settings.get("work_enabled"))
         await session.commit()

@@ -129,12 +129,12 @@ async def admin_menu(target, session: AsyncSession, cbd: Adm | None = None) -> N
     )
     await show(target, text, kb(
         [btn(orders_btn, Adm(s="ord"), style="primary")],
-        [btn("💱 Курсы", Adm(s="rates")), btn("⭐ Звёзды", Adm(s="stars")), btn("🎁 Подарки", Adm(s="cat", v="gift"))],
-        [btn("💎 Юзеры", Adm(s="cat", v="uname")), btn("🛠 Услуги", Adm(s="cat", v="service")),
-         btn("🖼 Работы", Adm(s="cat", v="portfolio"))],
-        [btn("📢 Посты", Adm(s="ch")), btn("📨 Рассылка", Adm(s="bc")), btn("👤 Клиенты", Adm(s="cl"))],
-        [btn("📊 Статистика", Adm(s="stat")), btn(f"📝 Отзывы · {new_reviews}", Adm(s="rev"))],
-        [btn("🧩 Ещё", Adm(s="more")), btn("🏠 Меню клиента", Nav(to="menu"))],
+        [btn("💱 Курсы", Adm(s="rates")), btn("⭐ Звёзды", Adm(s="stars"))],
+        [btn("🎁 Подарки", Adm(s="cat", v="gift")), btn("💎 Юзеры", Adm(s="cat", v="uname"))],
+        [btn("📢 Посты", Adm(s="ch")), btn("📨 Рассылка", Adm(s="bc"))],
+        [btn("👤 Клиенты", Adm(s="cl")), btn("📊 Статистика", Adm(s="stat"))],
+        [btn(f"📝 Отзывы · {new_reviews}", Adm(s="rev")), btn("🧩 Ещё", Adm(s="more"))],
+        [btn("🏠 Меню клиента", Nav(to="menu"))],
     ))
 
 
@@ -170,12 +170,15 @@ async def more_menu(target, session: AsyncSession, cbd: Adm | None = None) -> No
     editing = settings.is_editing(uid)
     await show(target, (
         "🧩 <b>Ещё</b>\n\n"
-        "<blockquote>🎨 Оформление: тексты, кнопки, картинки\n"
+        "<blockquote>🛠 Услуги и портфолио разработки\n"
+        "🎨 Оформление: тексты, кнопки, картинки\n"
         "🌐 Сайт, подписка, рефералы, бэкапы, настройки</blockquote>"
     ), kb(
         [btn(("🟢 Режим редактирования: вкл" if editing else "⚪ Режим редактирования: выкл"), Adm(s="bt", a="mode"))],
-        [btn("✏️ Тексты", Adm(s="tx")), btn("🔘 Кнопки", Adm(s="bt")), btn("🖼 Картинки", Adm(s="img"))],
-        [btn("🌐 Сайт", Adm(s="web")), btn("📢 Подписка", Adm(s="sub")), btn("👥 Рефералы", Adm(s="ref"))],
+        [btn("🛠 Услуги", Adm(s="cat", v="service")), btn("🖼 Портфолио", Adm(s="cat", v="portfolio"))],
+        [btn("✏️ Тексты", Adm(s="tx")), btn("🔘 Кнопки", Adm(s="bt"))],
+        [btn("🖼 Картинки", Adm(s="img")), btn("🌐 Сайт и Web App", Adm(s="web"))],
+        [btn("📢 Подписка", Adm(s="sub")), btn("👥 Рефералы", Adm(s="ref"))],
         [btn("💾 Бэкапы", Adm(s="bk")), btn("⚙️ Настройки", Adm(s="set"))],
         [btn("◀️ Админка", Adm(s="menu"))],
     ))

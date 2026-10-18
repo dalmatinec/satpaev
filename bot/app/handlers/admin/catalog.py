@@ -53,7 +53,10 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
         b.row(btn(_label(it)[:64], Adm(s="cat", a="card", i=it.id, v=kind)))
     pager(b, page, pages, lambda p: Adm(s="cat", v=kind, p=p))
     b.row(btn("➕ Добавить", Adm(s="cat", a="add", v=kind)))
-    b.row(btn("⚙️ Админка", Adm(s="menu")))
+    if kind in ("service", "portfolio"):  # эти разделы лежат в «Ещё»
+        b.row(btn("◀️ Ещё", Adm(s="more")))
+    else:
+        b.row(btn("⚙️ Админка", Adm(s="menu")))
     hint = ""
     if kind == "uname":
         hint = (f"\n\nНаценка по умолчанию: <b>x{num(settings.get('uname_markup'))}</b>. "

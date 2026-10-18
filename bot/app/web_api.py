@@ -7,6 +7,7 @@
 """
 
 import logging
+import re
 import time
 
 from aiohttp import web
@@ -65,6 +66,34 @@ site_limit = Limiter(120, 60)
 user_limit = Limiter(30, 60)
 
 
+HOST_RE = re.compile(r"^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
+_auto_checked = False
+
+
+async def _auto_site(request: web.Request, bot: Bot, sm) -> None:
+    """Если ссылка сайта в админке ещё не задана, берём домен, который прислал nginx сайта.
+
+    Заголовок X-Site-Host ставит сам nginx (значение из его конфига, клиент его подменить не может),
+    поэтому чужой домен сюда не попадёт. Срабатывает один раз; дальше ссылка меняется только в админке.
+    """
+    global _auto_checked
+    if _auto_checked:
+        return
+    host = (request.headers.get("X-Site-Host") or "").strip().lower()
+    if not HOST_RE.match(host):
+        return
+    _auto_checked = True
+    if settings.is_set("site_url"):
+        return
+    from .services import webapp
+
+    async with sm() as session:
+        await settings.put(session, "site_url", f"https://{host}")
+        await session.commit()
+    await webapp.apply(bot)
+    log.info("Ссылка сайта найдена автоматически: https://%s", host)
+
+
 def _ip(request: web.Request) -> str:
     return request.headers.get("X-Real-IP") or request.remote or "?"
 
@@ -107,6 +136,10 @@ def make_app(bot: Bot, sm) -> web.Application:
         _hit()
         if not site_limit.allow(_ip(request)):
             return _json({"error": "too_many_requests"}, 429)
+        try:
+            await _auto_site(request, bot, sm)
+        except Exception:
+            log.exception("auto site failed")
         now = time.monotonic()
         if _site_cache is None or now - _site_cache[0] > SITE_TTL:
             try:

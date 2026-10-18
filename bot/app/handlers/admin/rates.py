@@ -35,7 +35,8 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
     b.row(btn("➕ Добавить валюту", Adm(s="rates", a="add")))
     ton = settings.get("ton_kzt")
     b.row(btn(f"💎 Курс TON: {money(ton) if ton else 'не задан'}", Adm(s="rates", a="ton")))
-    b.row(btn("📢 Курсы в канал", Adm(s="rates", a="post")), btn("🧾 Шаблон поста", Adm(s="rates", a="tpl")))
+    b.row(btn("📢 Отправить курсы", Adm(s="rates", a="post"), style="primary"),
+          btn("🧾 Шаблон поста", Adm(s="rates", a="tpl")))
     b.row(btn("⚙️ Админка", Adm(s="menu")))
     await show(
         target,
@@ -107,12 +108,12 @@ async def on_rates(cb: CallbackQuery, callback_data: Adm, session: AsyncSession,
     elif a == "ton":
         await ask(cb, state, "set_ton", "💎 Введите курс 1 TON в тенге, например <code>1450</code>:", Adm(s="rates"))
     elif a == "post":
+        from .channel import start_text_post
+
         text, ents = await posting.rates_post(session, cb.bot)
-        await show(cb, Rich(text, entities_from_store(ents)), kb(
-            [btn("📢 Опубликовать", Adm(s="rates", a="post_ok"))],
-            [btn("🧾 Изменить шаблон", Adm(s="rates", a="tpl"))],
-            [btn("◀️ Курсы", Adm(s="rates"))],
-        ))
+        await start_text_post(cb, state, session, text, ents, Adm(s="rates"),
+                              "👀 <b>Пост с курсами на сегодня</b>\nДата и курсы подставились сами. "
+                              "Поменять оформление: 💱 Курсы → 🧾 Шаблон поста.")
     elif a == "post_ok":
         text, ents = await posting.rates_post(session, cb.bot)
         ok, info = await posting.publish(session, cb.bot, text, ents, kind="rates")

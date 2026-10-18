@@ -1,3 +1,5 @@
+from contextlib import suppress
+
 from aiogram import F, Router
 from aiogram.filters import CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
@@ -106,11 +108,25 @@ async def cmd_start(
             and not await subscription.is_subscribed(message.bot, user.id)):
         await sub_view(message, required=False)
         return
+    from . import menu_button
+
+    await menu_button.ensure(message, session, user)
     await show_menu(message, user, is_admin)
 
 
 @router.callback_query(Nav.filter(F.to == "menu"))
-async def nav_menu(cb: CallbackQuery, user: User, is_admin: bool) -> None:
+async def nav_menu(cb: CallbackQuery, user: User, is_admin: bool, session: AsyncSession) -> None:
+    from . import menu_button
+
+    if menu_button.wanted() != (user.menu_kb or "") and cb.message:
+        # кнопки ещё нет: ставим и показываем меню новым сообщением под подсказкой
+        await answer(cb)
+        msg = cb.message
+        with suppress(Exception):
+            await msg.delete()  # старое меню убираем, чтобы не было двух
+        await menu_button.ensure(msg, session, user)
+        await show_menu(msg, user, is_admin)
+        return
     await show_menu(cb, user, is_admin)
 
 

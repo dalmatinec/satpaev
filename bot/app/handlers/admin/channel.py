@@ -13,11 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...cb import Adm, AIn
 from ...config import config
-from ...db.models import BotChat, Post, PosterChannel
+from ...db.models import BotChat, Post, PosterChannel, User
 from ...services import posting, settings
 from ...states import AdmSt
 from ...ui import answer, btn, kb, show
-from ...utils import entities_to_store, fdate, h
+from ...utils import entities_from_store, entities_to_store, fdate, h, strip_custom_emoji
 from .common import screen
 
 router = Router(name="admin_channel")
@@ -63,7 +63,7 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
                  "в .env и войдите командой из README.</i>")
     await show(target, text, kb(
         [btn("✍️ Новый пост", Adm(s="ch", a="new"))],
-        [btn("💱 Курсы в канал", Adm(s="rates", a="post")), btn("📄 Очередь", Adm(s="ch", a="queue"))],
+        [btn("💱 Отправить курсы", Adm(s="rates", a="post")), btn("📄 Очередь", Adm(s="ch", a="queue"))],
         [btn(f"👤 Мои каналы ({acc})", Adm(s="ch", a="mine")), btn(f"💬 Чаты с ботом ({chats})", Adm(s="ch", a="chats"))],
         [btn("🔁 Курсы и отзывы: аккаунт или бот", Adm(s="ch", a="mode"))],
         [btn("⚙️ Админка", Adm(s="menu"))],
@@ -164,12 +164,17 @@ async def _options(session: AsyncSession) -> list[dict]:
             opts.append({"type": "acc", "target": str(c.id), "title": f"👤 {c.title}", "on": bool(is_main)})
         if not chans and config.channel_id:
             opts.append({"type": "acc", "target": config.channel_id, "title": f"👤 {config.channel_id}", "on": True})
+        if config.channel_id:  # тот же канал, но от имени бота
+            opts.append({"type": "botch", "target": config.channel_id, "title": f"🤖 {config.channel_id} от бота", "on": False})
     elif config.channel_id:
         opts.append({"type": "botch", "target": config.channel_id, "title": f"🤖 {config.channel_id} (от бота)", "on": True})
     chats = await session.scalar(
         select(func.count(BotChat.id)).where(BotChat.active.is_(True), BotChat.type.in_(GROUP_TYPES))) or 0
     if chats:
         opts.append({"type": "chats", "target": "", "title": f"💬 Все чаты с ботом ({chats})", "on": False})
+    users = await session.scalar(select(func.count(User.id)).where(User.is_blocked.is_(False))) or 0
+    if users:
+        opts.append({"type": "users", "target": "", "title": f"📨 Рассылка всем клиентам ({users})", "on": False})
     return opts
 
 
@@ -179,9 +184,10 @@ async def _targets_screen(target, state: FSMContext) -> None:
     rows = [[btn(("✅ " if o["on"] else "▫️ ") + o["title"][:56], AIn(a="pt", v=str(i)))] for i, o in enumerate(opts)]
     chosen = sum(1 for o in opts if o["on"])
     rows.append([btn(f"📢 Опубликовать ({chosen})", AIn(a="post_ok"))])
-    rows.append([btn("◀️ Отмена", Adm(s="ch"))])
+    rows.append([btn("◀️ Отмена", Adm.unpack(data["back"]) if data.get("back") else Adm(s="ch"))])
     note = "" if data.get("account_ok", True) else "\n\n⚠️ Такой тип сообщения аккаунт не публикует, он уйдёт только в чаты с ботом."
-    text = "📍 <b>Куда публикуем?</b>\nОтметьте каналы и чаты." + note
+    text = ("📍 <b>Куда отправить?</b>\nОтметьте нужное: 👤 от вашего аккаунта, 🤖 от бота, "
+            "💬 во все группы с ботом, 📨 личным сообщением всем клиентам." + note)
     if not opts:
         text = "Некуда публиковать: укажите CHANNEL_ID в .env или добавьте бота в группу."
     await show(target, text, kb(*rows))
@@ -253,7 +259,33 @@ async def post_ok(cb: CallbackQuery, state: FSMContext, session: AsyncSession, s
     if any(o["type"] == "chats" for o in chosen):
         asyncio.create_task(posting.run_chats(cb.bot, sm, data["from_chat"], data["msg_id"], cb.from_user.id))
         report.append("💬 Рассылка в чаты запущена, отчёт придёт сообщением")
+    if any(o["type"] == "users" for o in chosen):
+        from . import broadcast
+
+        if broadcast.start(cb.bot, sm, "all", data["from_chat"], data["msg_id"], cb.from_user.id):
+            report.append("📨 Рассылка клиентам запущена, отчёт придёт сообщением")
+        else:
+            report.append("⚠️ Уже идёт другая рассылка клиентам, дождитесь окончания")
     await show(cb, "📢 <b>Готово</b>\n\n" + h("\n".join(report)), kb(
         [btn("✍️ Ещё пост", Adm(s="ch", a="new")), btn("📄 Очередь", Adm(s="ch", a="queue"))],
         [btn("◀️ Посты", Adm(s="ch"))],
     ))
+
+
+async def start_text_post(cb: CallbackQuery, state: FSMContext, session: AsyncSession, text: str,
+                          ents: list[dict] | None, back: Adm, title: str) -> None:
+    """Готовый текст (например, курсы на сегодня): превью и выбор, куда отправить."""
+    await show(cb, title)
+    try:
+        msg = await cb.bot.send_message(cb.from_user.id, text, entities=entities_from_store(ents), parse_mode=None)
+    except TelegramBadRequest:
+        ents = strip_custom_emoji(ents)
+        msg = await cb.bot.send_message(cb.from_user.id, text, entities=entities_from_store(ents), parse_mode=None)
+    msg = msg.as_(cb.bot)
+    await state.set_state(AdmSt.post_confirm)
+    await state.set_data({
+        "from_chat": msg.chat.id, "msg_id": msg.message_id, "text": text, "entities": ents or [],
+        "file_id": None, "kind": "", "name": "", "account_ok": True, "photo": None,
+        "opts": await _options(session), "back": back.pack(),
+    })
+    await _targets_screen(msg, state)

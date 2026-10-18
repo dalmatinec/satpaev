@@ -47,6 +47,8 @@ class User(Base):
     total_spent: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, server_default=ZERO)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # какая кнопка «Главное меню» стоит у клиента под полем ввода (пусто = нет)
+    menu_kb: Mapped[str] = mapped_column(String(64), default="", server_default=EMPTY)
 
     __table_args__ = (
         Index("ix_users_username", "username"),

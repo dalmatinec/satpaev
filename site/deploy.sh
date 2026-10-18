@@ -21,7 +21,10 @@ check_api() {
   printf "Проверяю связь с ботом"
   for _ in $(seq 1 30); do
     if curl -fsS -m 3 -o /dev/null "${API_UPSTREAM}/api/health" 2>/dev/null; then
-      echo; echo "✅ Бот отдаёт данные сайту (курсы, цены, тексты)"; return 0
+      echo; echo "✅ Бот отдаёт данные сайту (курсы, цены, тексты)"
+      # запрос через сам сайт: бот узнаёт адрес сайта и ставит кнопку Web App, если ссылку ещё не вписали
+      [ -n "${SITE_ADDRESS:-}" ] && curl -fsS -m 8 -o /dev/null "https://${SITE_ADDRESS}/api/site" 2>/dev/null || true
+      return 0
     fi
     printf "."; sleep 2
   done
@@ -130,6 +133,7 @@ server {
         proxy_pass ${API_UPSTREAM};
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Site-Host "${SITE_ADDRESS:-}";
         proxy_connect_timeout 3s;
         proxy_read_timeout 12s;
         include /etc/nginx/snippets/satpaev-headers.conf;

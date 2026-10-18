@@ -10,6 +10,7 @@ services:
     environment:
       CADDY_ADDRESS: ${CADDY_ADDRESS:-:80}
       API_UPSTREAM: ${API_UPSTREAM:-http://127.0.0.1:8090}
+      SITE_HOST: ${SITE_ADDRESS:-}
     volumes:
       - ./www:/srv:ro
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

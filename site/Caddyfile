@@ -17,6 +17,7 @@
 		respond @notget 405
 		reverse_proxy {$API_UPSTREAM:http://127.0.0.1:8090} {
 			header_up X-Real-IP {remote_host}
+			header_up X-Site-Host {$SITE_HOST:}
 		}
 	}
 
