@@ -85,7 +85,9 @@ a { color: inherit; }
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
 }
 /* шапка плотнее: под ней проезжает контент, текст должен читаться */
-.nav.glass { background: var(--lg-sheen), linear-gradient(135deg, rgba(22, 12, 48, .72), rgba(14, 8, 32, .62)); }
+.nav.glass { background: var(--lg-sheen), linear-gradient(135deg, rgba(22, 12, 48, .84), rgba(14, 8, 32, .78)); }
+/* калькулятор сразу под главным экраном, без большого отступа */
+.hero + .section { padding-top: clamp(16px, 3vw, 40px); }
 /* без поддержки размытия (старые браузеры): плотнее, чтобы текст читался */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass { background: var(--lg-sheen), linear-gradient(160deg, rgba(52, 30, 104, .9), rgba(20, 11, 44, .95)); }
@@ -121,7 +123,7 @@ a { color: inherit; }
 
 /* ---------- главный экран ---------- */
 .hero, .section, .features { max-width: 1320px; margin-left: auto; margin-right: auto; padding-left: var(--gutter); padding-right: var(--gutter); }
-.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .9fr) minmax(0, .85fr); gap: 28px; align-items: center;
+.hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 28px; align-items: center;
   padding-top: clamp(48px, 7vw, 100px); padding-bottom: 40px; }
 .eyebrow { display: flex; align-items: center; gap: 14px; margin: 0 0 22px; color: var(--muted); font-size: .75rem; letter-spacing: .28em; text-transform: uppercase; }
 .eyebrow-line { width: 34px; height: 1px; background: linear-gradient(90deg, var(--pink), transparent); }
@@ -143,9 +145,9 @@ a { color: inherit; }
 @media (hover: hover) and (pointer: fine) { .ring-spark { animation: spark 6s linear infinite; } }
 @keyframes spark { to { stroke-dashoffset: -1040; } }
 
-.services { border-radius: 32px; padding: 10px; }
+.services { border-radius: 32px; padding: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 10px; }
 .svc { display: flex; align-items: center; gap: 14px; padding: 12px; border-radius: 22px; text-decoration: none; transition: background-color .25s; }
-.svc + .svc { border-top: 1px solid rgba(255, 255, 255, .07); }
+.svc { background: transparent; }
 .svc:hover { background: rgba(255, 255, 255, .07); }
 .svc-ic { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; color: #fff;
   background: radial-gradient(100% 80% at 30% 15%, rgba(255, 255, 255, .38), rgba(255, 255, 255, 0) 55%), radial-gradient(circle at 50% 80%, rgba(232, 121, 249, .45), rgba(124, 58, 237, .25));
@@ -157,6 +159,18 @@ a { color: inherit; }
 .svc:hover .svc-go { transform: translateX(4px); color: var(--pink); }
 
 .features { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding-top: 10px; }
+.features.section-tight { padding-top: clamp(28px, 4vw, 48px); }
+
+/* NFT подарки */
+.gifts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.gift { display: flex; flex-direction: column; gap: 6px; padding: 22px; border-radius: 28px; text-decoration: none; }
+.gift-ic { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 8px; border-radius: 50%; color: #fff;
+  background: radial-gradient(100% 80% at 30% 15%, rgba(255, 255, 255, .4), rgba(255, 255, 255, 0) 55%), radial-gradient(circle at 50% 80%, rgba(232, 121, 249, .5), rgba(99, 102, 241, .3));
+  box-shadow: inset 0 1px .5px rgba(255, 255, 255, .6), 0 6px 18px -6px rgba(217, 70, 239, .7); }
+.gift b { font-size: 1.0625rem; overflow-wrap: anywhere; }
+.gift span { color: #f0abfc; font-weight: 800; font-variant-numeric: tabular-nums; }
+.gift:hover { transform: translateY(-2px); transition: transform .3s var(--ease); }
+.gifts-go { margin-top: 18px; }
 .feat { padding: 28px 26px; border-radius: var(--radius); }
 .feat .i { color: #d8b4fe; filter: drop-shadow(0 0 8px rgba(217, 70, 239, .8)); }
 .feat h3 { margin: 18px 0 8px; font-size: 1.1875rem; font-weight: 800; }
@@ -316,10 +330,8 @@ a { color: inherit; }
 
 /* ---------- адаптив ---------- */
 @media (max-width: 1180px) {
-  .hero { grid-template-columns: minmax(0, 1fr) minmax(0, .9fr); }
-  .services { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .svc + .svc { border-top: 0; }
   .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gifts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 860px) {
   .nav-links { display: none; }
@@ -328,6 +340,7 @@ a { color: inherit; }
   .hero-logo { min-height: 320px; order: -1; }
   .cube { width: min(70%, 280px); }
   .services { grid-template-columns: minmax(0, 1fr); }
+  .gifts { grid-template-columns: minmax(0, 1fr); }
   .ex, .calc, .dev { grid-template-columns: minmax(0, 1fr); }
   .plans { grid-template-columns: minmax(0, 1fr); }
   .steps { grid-template-columns: 1fr 1fr; }

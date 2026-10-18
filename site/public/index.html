@@ -77,11 +77,11 @@
       <span data-brand>SatBox</span>
     </a>
     <nav class="nav-links" aria-label="Разделы">
-      <a href="#services">Сервисы</a>
       <a href="#exchange">Обмен</a>
       <a href="#check">Юзернеймы</a>
       <a href="#premium">Premium</a>
       <a href="#stars">Звёзды</a>
+      <a href="#services">Сервисы</a>
       <a href="#faq">FAQ</a>
     </nav>
     <a class="btn btn-outline btn-sm" data-bot href="#"><svg class="i" width="18" height="18"><use href="#i-send"/></svg>Telegram</a>
@@ -112,34 +112,8 @@
         <img class="cube" src="img/logo-mark.webp?v=__V__" width="520" height="520" alt="SatBox">
       </div>
 
-      <aside class="services glass reveal" id="services" aria-label="Сервисы">
-        <a class="svc" data-bot-start="ex" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-swap"/></svg></span>
-          <span class="svc-t"><b>Криптообмен</b><small data-t="site_s_ex">USDT, TON и другие по курсу дня</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
-        <a class="svc" data-bot-start="un" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-user"/></svg></span>
-          <span class="svc-t"><b>Юзернеймы</b><small data-t="site_s_un">Короткие и под заказ через Fragment</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
-        <a class="svc" data-bot-start="premium" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-crown"/></svg></span>
-          <span class="svc-t"><b>Telegram Premium</b><small data-t="site_s_premium">3, 6 или 12 месяцев, без входа в аккаунт</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
-        <a class="svc" data-bot-start="stars" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-star"/></svg></span>
-          <span class="svc-t"><b>Stars</b><small data-t="site_s_stars">Оптом от 500 штук</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
-        <a class="svc" data-bot-start="gifts" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-gem"/></svg></span>
-          <span class="svc-t"><b>NFT и подарки</b><small data-t="site_s_gifts">Коллекционные NFT подарки</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
-        <a class="svc" data-bot-start="dev" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-code"/></svg></span>
-          <span class="svc-t"><b>Telegram боты</b><small data-t="site_s_dev">Разработка ботов и сайтов</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
-        <a class="svc" data-bot-start="dev" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-server"/></svg></span>
-          <span class="svc-t"><b>Сервера</b><small data-t="site_s_srv">Деплой, домен, SSL, Docker</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
-      </aside>
     </section>
 
-    <section class="features">
-      <article class="feat glass reveal"><svg class="i" width="30" height="30"><use href="#i-bolt"/></svg>
-        <h3 data-t="site_f1_title">Быстро</h3><p data-t="site_f1_text">Заказ оформляется в боте за минуту, выполнение от 15 минут до 3 часов.</p></article>
-      <article class="feat glass reveal"><svg class="i" width="30" height="30"><use href="#i-shield"/></svg>
-        <h3 data-t="site_f2_title">Безопасно</h3><p data-t="site_f2_text">Оплата после согласования цены, каждый этап виден в боте.</p></article>
-      <article class="feat glass reveal"><svg class="i" width="30" height="30"><use href="#i-headset"/></svg>
-        <h3 data-t="site_f3_title">На связи</h3><p data-t="site_f3_text">Менеджер отвечает прямо в Telegram.</p></article>
-      <article class="feat glass reveal"><svg class="i" width="30" height="30"><use href="#i-crown"/></svg>
-        <h3 data-t="site_f4_title">Удобно</h3><p data-t="site_f4_text">Заказы, статусы и отзывы в одном боте.</p></article>
-    </section>
 
     <!-- ===== обмен ===== -->
     <section id="exchange" class="section">
@@ -224,6 +198,14 @@
       <div class="plans" data-premium></div>
     </section>
 
+    <!-- ===== NFT подарки ===== -->
+    <section id="gifts" class="section">
+      <h2 class="title reveal">NFT подарки</h2>
+      <p class="sub reveal" data-t="site_gifts_text">Коллекционные подарки Telegram: выберите на витрине в боте, передадим на ваш аккаунт.</p>
+      <div class="gifts" data-gifts></div>
+      <a class="btn btn-outline gifts-go" data-bot-start="gifts" href="#"><svg class="i" width="18" height="18"><use href="#i-gem"/></svg>Вся витрина в боте</a>
+    </section>
+
     <!-- ===== звёзды ===== -->
     <section id="stars" class="section">
       <h2 class="title reveal">Звёзды Telegram</h2>
@@ -249,6 +231,39 @@
           <a class="btn btn-neon btn-wide" data-buy-stars href="#"><svg class="i" width="20" height="20"><use href="#i-star"/></svg>Купить в боте</a>
         </div>
       </div>
+    </section>
+
+    <!-- ===== все сервисы ===== -->
+    <section id="services" class="section">
+      <h2 class="title reveal">Все сервисы</h2>
+      <p class="sub reveal">Нажмите на сервис, и бот откроет нужный раздел.</p>
+        <div class="services glass reveal">
+          <a class="svc" data-bot-start="ex" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-swap"/></svg></span>
+            <span class="svc-t"><b>Криптообмен</b><small data-t="site_s_ex">USDT, TON и другие по курсу дня</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
+          <a class="svc" data-bot-start="un" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-user"/></svg></span>
+            <span class="svc-t"><b>Юзернеймы</b><small data-t="site_s_un">Короткие и под заказ через Fragment</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
+          <a class="svc" data-bot-start="premium" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-crown"/></svg></span>
+            <span class="svc-t"><b>Telegram Premium</b><small data-t="site_s_premium">3, 6 или 12 месяцев, без входа в аккаунт</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
+          <a class="svc" data-bot-start="stars" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-star"/></svg></span>
+            <span class="svc-t"><b>Stars</b><small data-t="site_s_stars">Оптом от 500 штук</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
+          <a class="svc" data-bot-start="gifts" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-gem"/></svg></span>
+            <span class="svc-t"><b>NFT и подарки</b><small data-t="site_s_gifts">Коллекционные NFT подарки</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
+          <a class="svc" data-bot-start="dev" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-code"/></svg></span>
+            <span class="svc-t"><b>Telegram боты</b><small data-t="site_s_dev">Разработка ботов и сайтов</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
+          <a class="svc" data-bot-start="dev" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-server"/></svg></span>
+            <span class="svc-t"><b>Сервера</b><small data-t="site_s_srv">Деплой, домен, SSL, Docker</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
+        </div>
+    </section>
+
+    <section class="features section-tight" aria-label="Преимущества">
+      <article class="feat glass reveal"><svg class="i" width="30" height="30"><use href="#i-bolt"/></svg>
+        <h3 data-t="site_f1_title">Быстро</h3><p data-t="site_f1_text">Заказ оформляется в боте за минуту, выполнение от 15 минут до 3 часов.</p></article>
+      <article class="feat glass reveal"><svg class="i" width="30" height="30"><use href="#i-shield"/></svg>
+        <h3 data-t="site_f2_title">Безопасно</h3><p data-t="site_f2_text">Оплата после согласования цены, каждый этап виден в боте.</p></article>
+      <article class="feat glass reveal"><svg class="i" width="30" height="30"><use href="#i-headset"/></svg>
+        <h3 data-t="site_f3_title">На связи</h3><p data-t="site_f3_text">Менеджер отвечает прямо в Telegram.</p></article>
+      <article class="feat glass reveal"><svg class="i" width="30" height="30"><use href="#i-crown"/></svg>
+        <h3 data-t="site_f4_title">Удобно</h3><p data-t="site_f4_text">Заказы, статусы и отзывы в одном боте.</p></article>
     </section>
 
     <!-- ===== разработка ===== -->

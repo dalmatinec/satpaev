@@ -113,6 +113,7 @@
         data.texts = j.texts || {};
         if (j.fee && typeof j.fee.amount === "number") data.fee = j.fee;
         if (Array.isArray(j.premium)) data.premium = j.premium;
+        if (Array.isArray(j.gifts)) data.gifts = j.gifts;
         return true;
       })
       .catch(function () { clearTimeout(timer); return false; });
@@ -478,13 +479,34 @@
     });
   }
 
+  // ---------- NFT подарки (витрина из бота) ----------
+  var giftsBox = $("[data-gifts]");
+  function renderGifts() {
+    if (!giftsBox) return;
+    giftsBox.textContent = "";
+    var list = (data.gifts || []).slice(0, 6);
+    giftsBox.hidden = !list.length;
+    list.forEach(function (g) {
+      var a = el("a", "gift glass");
+      a.href = botLink("gifts");
+      var ic = el("span", "gift-ic");
+      var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "i"); svg.setAttribute("width", "22"); svg.setAttribute("height", "22");
+      var use = document.createElementNS("http://www.w3.org/2000/svg", "use"); use.setAttribute("href", "#i-gem");
+      svg.appendChild(use); ic.appendChild(svg); a.appendChild(ic);
+      a.appendChild(el("b", "", g.title || "Подарок"));
+      a.appendChild(el("span", "", g.price ? tenge(g.price) : (g.price_text || "цена в боте")));
+      giftsBox.appendChild(a);
+    });
+  }
+
   // ---------- старт ----------
   function render() {
-    applyLinks(); applyTexts(); renderRates(); renderCodes(); calcEx(); renderTiers(); renderPremium();
+    applyLinks(); applyTexts(); renderRates(); renderCodes(); calcEx(); renderTiers(); renderPremium(); renderGifts();
     setQty(qtyInput ? +qtyInput.value : 1000, true);
   }
   render();
   loadSite().then(function (ok) { if (ok) render(); });
   // курсы и тексты подтягиваются раз в минуту, пока вкладка открыта
-  setInterval(function () { if (!document.hidden) loadSite().then(function (ok) { if (ok) { renderRates(); renderCodes(); calcEx(); renderPremium(); } }); }, 60000);
+  setInterval(function () { if (!document.hidden) loadSite().then(function (ok) { if (ok) { renderRates(); renderCodes(); calcEx(); renderPremium(); renderGifts(); } }); }, 60000);
 })();

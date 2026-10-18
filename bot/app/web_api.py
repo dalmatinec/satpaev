@@ -14,7 +14,7 @@ from aiohttp import web
 from aiogram import Bot
 from sqlalchemy import select
 
-from .db.models import Rate
+from .db.models import Item, Rate
 from .services import settings, username_check
 from .texts import TEXTS, strip_html
 from .utils import USERNAME_RE
@@ -114,6 +114,11 @@ async def _build_site(bot: Bot, sm) -> dict:
             select(Rate).where(Rate.is_active.is_(True)).order_by(Rate.sort, Rate.id)
         )).scalars().all()
         await premium.refresh_rate(session)
+        gift_rows = (await session.execute(
+            select(Item).where(Item.kind == "gift", Item.is_active.is_(True)).order_by(Item.sort, Item.id.desc()).limit(6)
+        )).scalars().all()
+    gifts = [{"title": strip_html(g.title)[:80], "price": float(g.price) if g.price else None,
+              "price_text": strip_html(g.price_text or "")[:60]} for g in gift_rows]
     prem = []
     for m, usd in premium.plans():
         kzt = premium.price_kzt(usd)
@@ -132,6 +137,7 @@ async def _build_site(bot: Bot, sm) -> dict:
         ],
         "stars": {"tiers": [[q, p] for q, p in settings.star_tiers()], "min_qty": min_qty()},
         "premium": prem,
+        "gifts": gifts,
         "sla": {k: str(settings.get(f"sla_{k}") or "") for k in ("stars", "exchange", "gifts", "premium")},
         "fee": {"amount": float(settings.get("ex_fee") or 0),
                 "name": strip_html(str(settings.get("ex_fee_name") or "Сервисный сбор"))},
