@@ -20,6 +20,8 @@ DEFAULTS: dict = {
     "sla_exchange": "от 5 до 30 минут",
     "sla_gifts": "до 3 часов",
     "ton_kzt": 0,
+    "ex_fee": 0,  # фиксированный сбор за каждую сделку обмена, ₸ (0 = без сбора)
+    "ex_fee_name": "Сервисный сбор",
     "uname_markup": 2,
     "uname_hold_days": 7,
     "uname_auction_days": 7,
@@ -50,7 +52,8 @@ def _default_rich(key: str) -> Rich:
         text, ents = Text(
             Bold("💱 Курсы на {date}"), "\n\n", "{rates}", "\n\n",
             "⭐ Звёзды от {stars_min}\n",
-            "⚡ Обмен {sla_exchange}\n\n",
+            "⚡ Обмен {sla_exchange}\n",
+            "🧾 {fee}\n\n",
             "Заказать: {bot}",
         ).render()
         return Rich(text, ents or None)

@@ -360,7 +360,7 @@ async def op_set_time(ctx: Ctx) -> None:
 @op("set_num")
 async def op_set_num(ctx: Ctx) -> None:
     value = parse_number(ctx.text)
-    limit = 10 ** 9 if ctx.data["key"] == "min_order" else 1000
+    limit = 10 ** 9 if ctx.data["key"] in ("min_order", "ex_fee") else 1000
     if value is None or value > limit:
         await ctx.target.answer("Нужно число:")
         return

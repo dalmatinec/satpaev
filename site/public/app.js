@@ -11,7 +11,8 @@
   // данные: из config.js, потом свежие из бота через /api/site
   var data = {
     bot: cfg.bot || "", brand: cfg.brand || "SatBox", min_order: cfg.minOrder || 10000,
-    rates: [], ton_kzt: 0, stars: { tiers: cfg.stars || [[500, 20]], min_qty: 500 }, texts: {}
+    rates: [], ton_kzt: 0, stars: { tiers: cfg.stars || [[500, 20]], min_qty: 500 }, texts: {},
+    fee: { amount: 0, name: "Сервисный сбор" }
   };
 
   var fmt = function (n, digits) {
@@ -108,6 +109,7 @@
         data.ton_kzt = j.ton_kzt || 0;
         if (j.stars && Array.isArray(j.stars.tiers) && j.stars.tiers.length) data.stars = j.stars;
         data.texts = j.texts || {};
+        if (j.fee && typeof j.fee.amount === "number") data.fee = j.fee;
         return true;
       })
       .catch(function () { clearTimeout(timer); return false; });
@@ -180,12 +182,26 @@
   var ratesBox = $("[data-rates]"), codesBox = $("[data-ex-codes]"), amountEl = $("[data-ex-amount]");
   var unitBtn = $("[data-ex-unit]"), outEl = $("[data-ex-out]"), rateEl = $("[data-ex-rate]"), warnEl = $("[data-ex-warn]");
   var exGo = $("[data-ex-go]"), exLabel = $("[data-ex-label]"), exOutLabel = $("[data-ex-out-label]");
+  var feeRow = $("[data-ex-fee]"), feeNote = $("[data-fee-note]");
+  // строка вида «Курс: 25 000 ₸ + Сервисный сбор: 2 500 ₸» без HTML (только текстовые узлы)
+  function feeText(el, parts) {
+    while (el.firstChild) el.removeChild(el.firstChild);
+    parts.forEach(function (p) {
+      if (p.b) { var b = document.createElement("b"); b.textContent = p.b; el.appendChild(b); }
+      else el.appendChild(document.createTextNode(p));
+    });
+  }
 
   function rateOf(code) { return data.rates.filter(function (r) { return r.code === code; })[0]; }
 
   function renderRates() {
     if (!ratesBox) return;
     ratesBox.textContent = "";
+    if (feeNote) {
+      var fa = (data.fee && Number(data.fee.amount)) || 0;
+      feeNote.hidden = !fa;
+      if (fa) feeText(feeNote, ["+ " + (data.fee.name || "Сервисный сбор").toLowerCase() + " ", { b: tenge(fa) }, " за сделку"]);
+    }
     if (!data.rates.length) {
       var p = document.createElement("p"); p.className = "muted pad"; p.textContent = "Курс уточняйте в боте: нажмите «Обменять в боте».";
       ratesBox.appendChild(p);
@@ -219,27 +235,42 @@
     }
     if (!rateOf(ex.code)) ex.code = data.rates[0].code;
     var r = rateOf(ex.code);
-    var rate = ex.dir === "buy" ? r.sell : r.buy;
+    var buy = ex.dir === "buy";
+    var rate = buy ? r.sell : r.buy;
+    var fee = (data.fee && Number(data.fee.amount)) || 0, feeName = (data.fee && data.fee.name) || "Сервисный сбор";
     var amount = parseFloat(String(amountEl.value).replace(",", ".")) || 0;
     unitBtn.textContent = ex.unit === "coin" ? r.code : "₸";
-    exLabel.textContent = (ex.dir === "buy" ? "Сколько купить" : "Сколько продать") + (ex.unit === "coin" ? "" : ", в тенге");
-    warnEl.hidden = true;
+    exLabel.textContent = (buy ? "Сколько купить" : "Сколько продать") + (ex.unit === "coin" ? "" : (buy ? ", всего платите в тенге" : ", хотите получить в тенге"));
+    warnEl.hidden = true; feeRow.hidden = true;
     if (!rate) {
       outEl.textContent = "нет"; rateEl.textContent = "нет";
-      warnEl.textContent = ex.dir === "buy" ? "Покупка " + r.code + " сейчас недоступна" : "Продажа " + r.code + " сейчас недоступна";
+      warnEl.textContent = buy ? "Покупка " + r.code + " сейчас недоступна" : "Продажа " + r.code + " сейчас недоступна";
       warnEl.hidden = false;
     } else {
-      var kzt = ex.unit === "coin" ? amount * rate : amount;
-      var coins = ex.unit === "coin" ? amount : amount / rate;
+      var coins, gross, total;
+      if (ex.unit === "coin") {
+        coins = amount; gross = Math.round(coins * rate);
+        total = buy ? gross + fee : gross - fee;
+      } else {
+        total = amount;
+        gross = buy ? amount - fee : amount + fee;
+        coins = gross > 0 ? gross / rate : 0;
+      }
       rateEl.textContent = fmt(rate) + " ₸";
       if (ex.unit === "coin") {
-        exOutLabel.textContent = ex.dir === "buy" ? "Вы платите" : "Вы получаете";
-        outEl.textContent = tenge(kzt);
+        exOutLabel.textContent = buy ? "Итого к оплате" : "Вы получаете";
+        outEl.textContent = tenge(Math.max(total, 0));
       } else {
-        exOutLabel.textContent = ex.dir === "buy" ? "Вы получите" : "Нужно продать";
+        exOutLabel.textContent = buy ? "Вы получите" : "Нужно продать";
         outEl.textContent = fmt(coins, 2) + " " + r.code;
       }
-      if (amount > 0 && kzt < data.min_order) {
+      if (fee && amount > 0 && gross > 0) {
+        feeText(feeRow, ["По курсу: ", { b: tenge(gross) }, (buy ? " + " : " − ") + feeName.toLowerCase() + ": ", { b: tenge(fee) },
+          (buy ? " = к оплате " : " = вы получаете "), { b: tenge(Math.max(total, 0)) }]);
+        feeRow.hidden = false;
+      }
+      var base = buy ? total : gross;
+      if (amount > 0 && (base < data.min_order || total <= 0)) {
         warnEl.textContent = "Минимальный заказ " + tenge(data.min_order); warnEl.hidden = false;
       } else if (r.min && coins < r.min && amount > 0) {
         warnEl.textContent = "Минимум " + fmt(r.min) + " " + r.code; warnEl.hidden = false;

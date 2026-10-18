@@ -309,6 +309,12 @@ a { color: inherit; }
   .reveal { opacity: 1; translate: none; }
 }
 
+/* сервисный сбор */
+.fee-note { margin: 8px 0 0; padding: 0 4px; color: var(--muted); font-size: .875rem; }
+.fee-note b, .fee-row b { color: var(--ink); }
+.fee-row { margin: 10px 0 0; padding: 10px 14px; border-radius: 12px; background: rgba(139, 92, 246, .1);
+  border: 1px solid rgba(196, 181, 253, .18); color: var(--muted); font-size: .875rem; line-height: 1.5; }
+
 /* внутри Telegram Web App */
 .tg .cursor-glow { display: none; }
 .tg body { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }

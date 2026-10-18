@@ -126,6 +126,8 @@ async def _build_site(bot: Bot, sm) -> dict:
             for r in rates if r.buy or r.sell
         ],
         "stars": {"tiers": [[q, p] for q, p in settings.star_tiers()], "min_qty": min_qty()},
+        "fee": {"amount": float(settings.get("ex_fee") or 0),
+                "name": strip_html(str(settings.get("ex_fee_name") or "Сервисный сбор"))},
         "texts": texts,
     }
 

@@ -19,6 +19,30 @@ router = Router(name="exchange")
 t = settings.t
 
 
+def fee() -> Decimal:
+    """Фиксированный сбор за сделку обмена в тенге (0 = без сбора)."""
+    try:
+        return max(Decimal(str(settings.get("ex_fee") or 0)), Decimal(0))
+    except Exception:
+        return Decimal(0)
+
+
+def fee_name() -> str:
+    return str(settings.get("ex_fee_name") or "Сервисный сбор")
+
+
+def fee_line(sign: str = "") -> str:
+    f = fee()
+    return t("ex_fee_line", name=h(fee_name()), fee=sign + money(f)) if f else ""
+
+
+def _with_fee(text: str, line: str) -> str:
+    """Если админ поменял текст и убрал {fee_line}, сбор всё равно должен быть виден клиенту."""
+    if line and line.strip() and line.strip() not in text:
+        return text.rstrip() + "\n" + line.strip()
+    return text
+
+
 def rate_line(r: Rate) -> str:
     parts = []
     if r.sell:
@@ -38,7 +62,11 @@ async def ex_view(target, session: AsyncSession) -> None:
             "write_manager": mbtn("write_manager", Nav(to="support")), "home": back_menu()[0]}),
             photo=media.photo("ex"), edit=("ex_empty", "ex"))
         return
-    text = t("ex_screen", rates="\n".join(rate_line(r) for r in rates), sla=h(settings.get("sla_exchange")))
+    line = fee_line()
+    if line:
+        line = line.rstrip("\n") + " за сделку\n\n"
+    text = _with_fee(t("ex_screen", rates="\n".join(rate_line(r) for r in rates), sla=h(settings.get("sla_exchange")),
+                       fee_line=line), line)
     b = InlineKeyboardBuilder()
     for r in rates:
         b.button(text=r.code, callback_data=Shop(sec="ex", a="pair", i=r.id))
@@ -100,24 +128,36 @@ async def amount_input(message: Message, state: FSMContext, session: AsyncSessio
         await message.answer(t("ex_unavailable"))
         return
     rate = Decimal(str(rate))
+    f = fee()
+    buy = side == "buy"
     if is_tenge_input(message.text or ""):
-        kzt = round_up(value)
-        qty = (value / rate).quantize(Decimal("0.01"))
+        # сумма в тенге: при покупке это сколько клиент платит всего, при продаже сколько хочет получить
+        total = round_up(value)
+        gross = total - f if buy else total + f
+        if gross <= 0:
+            await message.answer(t("min_order", min=money(settings.min_order())))
+            return
+        qty = (gross / rate).quantize(Decimal("0.01"))
     else:
         qty = value
-        kzt = round_up(value * rate)
+    gross = round_up(qty * rate)
+    kzt = gross + f if buy else gross - f
     if r.min_qty and qty < r.min_qty:
         await message.answer(t("ex_min", min=num(r.min_qty), code=h(r.code)))
         return
-    if kzt < settings.min_order():
+    # минимальный заказ: при покупке считаем всё, что платит клиент, при продаже сумму по курсу
+    if (kzt if buy else gross) < settings.min_order() or kzt <= 0:
         await message.answer(t("min_order", min=money(settings.min_order())))
         return
-    await state.update_data(qty=str(qty), kzt=str(kzt), rate=str(rate))
+    await state.update_data(qty=str(qty), kzt=str(kzt), rate=str(rate), fee=str(f), gross=str(gross))
     await state.set_state(ExSt.confirm)
-    key = "ex_confirm_buy" if side == "buy" else "ex_confirm_sell"
+    key = "ex_confirm_buy" if buy else "ex_confirm_sell"
+    line = fee_line("+" if buy else "−")
+    text = t(key, qty=num(qty), code=h(r.code), kzt=money(kzt), rate=num(rate), sum=money(gross),
+             fee_line=line, sla=h(settings.get("sla_exchange")))
     await show(
         message,
-        t(key, qty=num(qty), code=h(r.code), kzt=money(kzt), rate=num(rate), sla=h(settings.get("sla_exchange"))),
+        _with_fee(text, line),
         kb([mbtn("confirm", In(a="ex_ok"))], [mbtn("change", Shop(sec="ex", a="pair", i=r.id))]),
         edit=(key, None),
     )
@@ -132,12 +172,15 @@ async def place(cb: CallbackQuery, state: FSMContext, session: AsyncSession, use
         await ex_view(cb, session)
         return
     qty, kzt, rate = Decimal(data["qty"]), Decimal(data["kzt"]), Decimal(data["rate"])
+    f = Decimal(data.get("fee") or 0)
     buy = data.get("dir") == "buy"
     op = "Покупка" if buy else "Продажа"
+    details = [["Операция", f"{op} {num(qty)} {r.code}"], ["Курс", f"{num(rate)} ₸"]]
+    if f:
+        details += [["По курсу", money(Decimal(data.get("gross") or 0))], [fee_name(), money(f)]]
+    details.append(["Клиент платит" if buy else "Клиент получает", money(kzt)])
     order = await create_order(
-        session, cb.bot, user, "exchange", f"{op} {num(qty)} {r.code}",
-        [["Операция", f"{op} {num(qty)} {r.code}"], ["Курс", f"{num(rate)} ₸"],
-         ["Клиент платит" if buy else "Клиент получает", money(kzt)]],
-        kzt, {"code": r.code, "dir": data.get("dir"), "qty": str(qty), "rate": str(rate)},
+        session, cb.bot, user, "exchange", f"{op} {num(qty)} {r.code}", details,
+        kzt, {"code": r.code, "dir": data.get("dir"), "qty": str(qty), "rate": str(rate), "fee": str(f)},
     )
     await show(cb, created_text(order), client_order_kb(order))

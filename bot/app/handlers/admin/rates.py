@@ -18,7 +18,7 @@ router = Router(name="admin_rates")
 
 PLACEHOLDERS = (
     "{date} дата · {rates} список курсов · {stars_min} цена звезды от · {sla_exchange} срок обмена · "
-    "{sla_stars} срок звёзд · {ton} курс TON · {bot} юзернейм бота · {brand} название"
+    "{sla_stars} срок звёзд · {ton} курс TON · {fee} сбор за сделку · {bot} юзернейм бота · {brand} название"
 )
 
 
@@ -35,6 +35,9 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
     b.row(btn("➕ Добавить валюту", Adm(s="rates", a="add")))
     ton = settings.get("ton_kzt")
     b.row(btn(f"💎 Курс TON: {money(ton) if ton else 'не задан'}", Adm(s="rates", a="ton")))
+    fee = settings.get("ex_fee") or 0
+    b.row(btn(f"🧾 Сбор: {money(fee) if fee else 'нет'}", Adm(s="rates", a="fee")),
+          btn("🏷 Название сбора", Adm(s="rates", a="fee_name")))
     b.row(btn("📢 Отправить курсы", Adm(s="rates", a="post"), style="primary"),
           btn("🧾 Шаблон поста", Adm(s="rates", a="tpl")))
     b.row(btn("⚙️ Админка", Adm(s="menu")))
@@ -42,7 +45,10 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
         target,
         "💱 <b>Курсы обмена</b>\n\n"
         "Покупка: по какому курсу вы покупаете у клиента.\nПродажа: по какому курсу продаёте клиенту.\n"
-        "Курс TON нужен, чтобы показывать цены юзеров в тенге.\n\nНажмите на валюту, чтобы изменить курс:",
+        "Курс TON нужен, чтобы показывать цены юзеров в тенге.\n"
+        f"🧾 {h(settings.get('ex_fee_name') or 'Сервисный сбор')}: "
+        f"<b>{money(settings.get('ex_fee')) if settings.get('ex_fee') else 'нет'}</b> за каждую сделку "
+        "(при покупке прибавляется к сумме, при продаже вычитается).\n\nНажмите на валюту, чтобы изменить курс:",
         b.as_markup(),
     )
 
@@ -105,6 +111,12 @@ async def on_rates(cb: CallbackQuery, callback_data: Adm, session: AsyncSession,
             await session.delete(r)
             await session.commit()
         await view(cb, session, Adm(s="rates"))
+    elif a == "fee":
+        await ask(cb, state, "set_num", "🧾 Сколько тенге брать за каждую сделку обмена? Например <code>2500</code>.\n"
+                  "<code>0</code> уберёт сбор.", Adm(s="rates"), key="ex_fee")
+    elif a == "fee_name":
+        await ask(cb, state, "set_text", "🏷 Как называть сбор? Например <code>Сервисный сбор</code>:", Adm(s="rates"),
+                  key="ex_fee_name")
     elif a == "ton":
         await ask(cb, state, "set_ton", "💎 Введите курс 1 TON в тенге, например <code>1450</code>:", Adm(s="rates"))
     elif a == "post":

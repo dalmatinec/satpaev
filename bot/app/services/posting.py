@@ -134,6 +134,8 @@ async def rates_post(session: AsyncSession, bot: Bot) -> tuple[str, list[dict]]:
         "bot": f"@{me.username}",
         "brand": str(settings.get("brand")),
         "ton": money(settings.get("ton_kzt")) if settings.get("ton_kzt") else "по запросу",
+        "fee": (f"{settings.get('ex_fee_name') or 'Сервисный сбор'}: {money(settings.get('ex_fee'))} за сделку"
+                if settings.get("ex_fee") else "без сбора"),
     }
     return fill_template(template, ents, values)
 
