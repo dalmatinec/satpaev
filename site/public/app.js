@@ -6,95 +6,111 @@
   var finePointer = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var USER_RE = /^[a-zA-Z][a-zA-Z0-9_]{3,31}$/;
 
-  // ---------- ссылки на бота и бренд ----------
-  var botBase = cfg.bot ? "https://t.me/" + cfg.bot : "#";
-  function botLink(start) { return cfg.bot ? botBase + (start ? "?start=" + encodeURIComponent(start) : "") : "#"; }
-  $$("[data-bot]").forEach(function (a) { a.href = botLink(); });
-  $$("[data-bot-start]").forEach(function (a) { a.href = botLink(a.getAttribute("data-bot-start")); });
-  if (cfg.brand) {
-    $$("[data-brand]").forEach(function (el) { el.textContent = cfg.brand; });
-    document.title = cfg.brand + ": звёзды, NFT подарки и юзернеймы Telegram";
-  }
-  var minOrder = $("[data-min-order]");
-  if (minOrder && cfg.minOrder) minOrder.textContent = String(cfg.minOrder).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " ₸";
-  var year = $("[data-year]");
-  if (year) year.textContent = new Date().getFullYear();
-  var channel = $("[data-channel]");
-  if (channel && cfg.channel) { channel.href = cfg.channel; channel.hidden = false; }
-  var manager = String(cfg.manager || "").replace(/^@/, "");
-  if (manager) {
-    $$("[data-manager]").forEach(function (a) { a.href = "https://t.me/" + manager; a.hidden = false; });
-    $$("[data-manager-name]").forEach(function (el) { el.textContent = "@" + manager; });
-  }
-
-  var fmt = function (n) {
-    var parts = String(Math.round(n * 100) / 100).split(".");
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-    return parts.join(",");
+  // данные: из config.js, потом свежие из бота через /api/site
+  var data = {
+    bot: cfg.bot || "", brand: cfg.brand || "SatBox", min_order: cfg.minOrder || 10000,
+    rates: [], ton_kzt: 0, stars: { tiers: cfg.stars || [[500, 20]], min_qty: 500 }, texts: {}
   };
 
-  // ---------- звёздное небо ----------
+  var fmt = function (n, digits) {
+    var d = digits === undefined ? (Number(n) % 1 ? 2 : 0) : digits;
+    var parts = Number(n).toFixed(d).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return parts.join(",").replace(/(,\d*?)0+$/, "$1").replace(/,$/, "");
+  };
+  var tenge = function (n) { return fmt(Math.round(n), 0) + " ₸"; };
+  function botLink(start) {
+    if (!data.bot) return "#";
+    return "https://t.me/" + data.bot + (start ? "?start=" + encodeURIComponent(start) : "");
+  }
+
+  // ---------- подстановка данных (только textContent, без HTML: защита от XSS) ----------
+  function applyLinks() {
+    $$("[data-bot]").forEach(function (a) { a.href = botLink(); });
+    $$("[data-bot-start]").forEach(function (a) { a.href = botLink(a.getAttribute("data-bot-start")); });
+    var manager = String(cfg.manager || "").replace(/^@/, "");
+    if (manager) {
+      $$("[data-manager]").forEach(function (a) { a.href = "https://t.me/" + manager; a.hidden = false; });
+      $$("[data-manager-name]").forEach(function (el) { el.textContent = "@" + manager; });
+    }
+    var channel = $("[data-channel]");
+    if (channel && cfg.channel) { channel.href = cfg.channel; channel.hidden = false; }
+  }
+
+  function applyTexts() {
+    $$("[data-t]").forEach(function (el) {
+      var v = data.texts[el.getAttribute("data-t")];
+      if (typeof v === "string" && v.trim()) el.textContent = v;
+    });
+    // последнее слово главного заголовка подсвечиваем, как на макете
+    var title = $(".hero-title");
+    if (title) {
+      var words = title.textContent.trim().split(/\s+/);
+      if (words.length > 1) {
+        var last = words.pop();
+        title.textContent = words.join(" ") + " ";
+        var hl = document.createElement("span");
+        hl.className = "hl"; hl.textContent = last;
+        title.appendChild(hl);
+      }
+    }
+    if (data.brand) {
+      $$("[data-brand]").forEach(function (el) { el.textContent = data.brand; });
+      document.title = data.brand + ": криптообмен, звёзды, NFT подарки и юзернеймы Telegram";
+    }
+    $$("[data-min-order]").forEach(function (el) { el.textContent = tenge(data.min_order); });
+    var year = $("[data-year]");
+    if (year) year.textContent = new Date().getFullYear();
+  }
+
+  function loadSite() {
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 6000);
+    return fetch("/api/site", { signal: ctrl ? ctrl.signal : undefined, credentials: "omit" })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (j) {
+        clearTimeout(timer);
+        data.bot = j.bot || data.bot;
+        data.brand = j.brand || data.brand;
+        data.min_order = j.min_order || data.min_order;
+        data.rates = Array.isArray(j.rates) ? j.rates : [];
+        data.ton_kzt = j.ton_kzt || 0;
+        if (j.stars && Array.isArray(j.stars.tiers) && j.stars.tiers.length) data.stars = j.stars;
+        data.texts = j.texts || {};
+        return true;
+      })
+      .catch(function () { clearTimeout(timer); return false; });
+  }
+
+  // ---------- фон: мелкие звёзды ----------
   var canvas = $(".sky");
   if (canvas && canvas.getContext) {
-    var ctx = canvas.getContext("2d");
-    var stars = [], W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
-    var px = 0, py = 0, tx = 0, ty = 0, shooting = null, last = 0;
-
+    var ctx = canvas.getContext("2d"), stars = [], W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
     var resize = function () {
       W = window.innerWidth; H = window.innerHeight;
-      canvas.width = W * dpr; canvas.height = H * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      var count = Math.min(220, Math.round((W * H) / 8000));
+      canvas.width = W * dpr; canvas.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       stars = [];
-      for (var i = 0; i < count; i++) {
-        stars.push({
-          x: Math.random() * W, y: Math.random() * H,
-          r: Math.random() * 1.05 + .15, z: Math.random() * .8 + .2,
-          tw: Math.random() * Math.PI * 2, sp: Math.random() * .02 + .005,
-          gold: Math.random() < .06
-        });
+      for (var i = 0, n = Math.min(160, Math.round(W * H / 9000)); i < n; i++) {
+        stars.push({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 1.1 + .2, t: Math.random() * 6.3, s: Math.random() * .02 + .004,
+          c: Math.random() < .2 ? "#f0abfc" : "#e9e3ff" });
       }
     };
-
-    var draw = function (t) {
+    var draw = function () {
       ctx.clearRect(0, 0, W, H);
-      px += (tx - px) * .05; py += (ty - py) * .05;
       for (var i = 0; i < stars.length; i++) {
-        var s = stars[i];
-        s.tw += s.sp;
-        var a = .25 + Math.sin(s.tw) * .3 + .2;
-        var x = s.x + px * s.z * 18, y = s.y + py * s.z * 18;
-        ctx.globalAlpha = Math.max(0, Math.min(1, a));
-        ctx.fillStyle = s.gold ? "#d8bd84" : "#e9e9f2";
-        ctx.beginPath(); ctx.arc(x, y, s.r * (s.gold ? 1.3 : 1), 0, 6.283); ctx.fill();
+        var s = stars[i]; s.t += s.s;
+        ctx.globalAlpha = .25 + Math.sin(s.t) * .25 + .2;
+        ctx.fillStyle = s.c; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.283); ctx.fill();
       }
-      // падающая звезда раз в несколько секунд
-      if (!shooting && t - last > 4200 + Math.random() * 6000) {
-        last = t;
-        shooting = { x: Math.random() * W * .7 + W * .2, y: Math.random() * H * .3, l: 0 };
-      }
-      if (shooting) {
-        shooting.l += 14;
-        var sx = shooting.x - shooting.l, sy = shooting.y + shooting.l * .45;
-        var g = ctx.createLinearGradient(sx, sy, sx + 120, sy - 54);
-        g.addColorStop(0, "rgba(241,223,180,.7)"); g.addColorStop(1, "rgba(241,223,180,0)");
-        ctx.globalAlpha = 1; ctx.strokeStyle = g; ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + 120, sy - 54); ctx.stroke();
-        if (shooting.l > W) shooting = null;
-      }
-      ctx.globalAlpha = 1;
       if (!reduce && !document.hidden) requestAnimationFrame(draw);
     };
-
-    resize();
-    window.addEventListener("resize", resize);
+    resize(); window.addEventListener("resize", resize);
     document.addEventListener("visibilitychange", function () { if (!document.hidden && !reduce) requestAnimationFrame(draw); });
-    window.addEventListener("pointermove", function (e) { tx = e.clientX / W - .5; ty = e.clientY / H - .5; }, { passive: true });
     requestAnimationFrame(draw);
   }
 
-  // ---------- свечение за курсором ----------
   var glow = $(".cursor-glow");
   if (glow && finePointer && !reduce) {
     var gx = -999, gy = -999, cx = -999, cy = -999;
@@ -106,245 +122,265 @@
     })();
   }
 
-  // ---------- полоса прокрутки ----------
   var bar = $(".progress");
   var onScroll = function () {
     var h = document.documentElement.scrollHeight - window.innerHeight;
     if (bar) bar.style.setProperty("--p", h > 0 ? window.scrollY / h : 0);
   };
-  window.addEventListener("scroll", onScroll, { passive: true });
-  onScroll();
+  window.addEventListener("scroll", onScroll, { passive: true }); onScroll();
 
-  // ---------- появление блоков ----------
   if ("IntersectionObserver" in window && !reduce) {
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
-      });
-    }, { threshold: .12, rootMargin: "0px 0px -40px 0px" });
-    $$(".reveal").forEach(function (el, i) {
-      el.style.transitionDelay = (i % 4) * 70 + "ms";
-      io.observe(el);
-    });
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+    }, { threshold: .1, rootMargin: "0px 0px -30px 0px" });
+    $$(".reveal").forEach(function (el, i) { el.style.transitionDelay = (i % 4) * 70 + "ms"; io.observe(el); });
   } else {
     $$(".reveal").forEach(function (el) { el.classList.add("in"); });
   }
 
-  // ---------- 3D наклон и подсветка стекла ----------
-  if (finePointer && !reduce) {
-    $$(".tilt").forEach(function (el) {
-      el.addEventListener("pointermove", function (e) {
-        var r = el.getBoundingClientRect();
-        var x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-        el.style.transform = "perspective(1000px) rotateX(" + ((.5 - y) * 4) + "deg) rotateY(" + ((x - .5) * 5) + "deg)";
-        el.style.setProperty("--sx", x * 100 + "%"); el.style.setProperty("--sy", y * 100 + "%");
+  // лёгкий 3D наклон куба за курсором
+  var cube = $(".cube");
+  if (cube && finePointer && !reduce) {
+    window.addEventListener("pointermove", function (e) {
+      var x = e.clientX / window.innerWidth - .5, y = e.clientY / window.innerHeight - .5;
+      cube.style.transform = "perspective(800px) rotateY(" + x * 14 + "deg) rotateX(" + (-y * 10) + "deg)";
+    }, { passive: true });
+  }
+
+  // ---------- обмен ----------
+  var ex = { code: "", dir: "buy", unit: "coin" };
+  var ratesBox = $("[data-rates]"), codesBox = $("[data-ex-codes]"), amountEl = $("[data-ex-amount]");
+  var unitBtn = $("[data-ex-unit]"), outEl = $("[data-ex-out]"), rateEl = $("[data-ex-rate]"), warnEl = $("[data-ex-warn]");
+  var exGo = $("[data-ex-go]"), exLabel = $("[data-ex-label]"), exOutLabel = $("[data-ex-out-label]");
+
+  function rateOf(code) { return data.rates.filter(function (r) { return r.code === code; })[0]; }
+
+  function renderRates() {
+    if (!ratesBox) return;
+    ratesBox.textContent = "";
+    if (!data.rates.length) {
+      var p = document.createElement("p"); p.className = "muted pad"; p.textContent = "Курс уточняйте в боте: нажмите «Обменять в боте».";
+      ratesBox.appendChild(p);
+    }
+    data.rates.forEach(function (r) {
+      var row = document.createElement("div");
+      row.className = "rate-row" + (r.code === ex.code ? " on" : "");
+      [r.code, r.buy ? fmt(r.buy) + " ₸" : "нет", r.sell ? fmt(r.sell) + " ₸" : "нет"].forEach(function (v, i) {
+        var el = document.createElement(i ? "span" : "b"); el.textContent = v; row.appendChild(el);
       });
-      el.addEventListener("pointerleave", function () { el.style.transform = ""; });
-    });
-    // магнитные кнопки
-    $$(".magnetic").forEach(function (el) {
-      el.addEventListener("pointermove", function (e) {
-        var r = el.getBoundingClientRect();
-        var x = e.clientX - r.left - r.width / 2, y = e.clientY - r.top - r.height / 2;
-        el.style.transform = "translate(" + x * .1 + "px," + y * .18 + "px)";
-      });
-      el.addEventListener("pointerleave", function () { el.style.transform = ""; });
+      row.addEventListener("click", function () { ex.code = r.code; renderRates(); renderCodes(); calcEx(); });
+      ratesBox.appendChild(row);
     });
   }
 
-  // ---------- юзернеймы на главном экране ----------
-  var lots = cfg.lots || [];
-  var nameEl = $("[data-scramble]"), lotName = $("[data-lot-name]"), lotStatus = $("[data-lot-status]");
-  var lotTon = $("[data-lot-ton]"), lotBar = $("[data-lot-bar]"), timerEl = $("[data-timer]");
-  var deadline = Date.now() + 6.9 * 864e5;
-  var glyphs = "abcdefghijklmnopqrstuvwxyz0123456789_";
+  function renderCodes() {
+    if (!codesBox) return;
+    codesBox.textContent = "";
+    data.rates.forEach(function (r) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "chip" + (r.code === ex.code ? " on" : ""); b.textContent = r.code;
+      b.addEventListener("click", function () { ex.code = r.code; renderRates(); renderCodes(); calcEx(); });
+      codesBox.appendChild(b);
+    });
+  }
 
-  function scramble(el, to) {
-    if (!el) return;
-    if (reduce) { el.textContent = to; return; }
-    var from = el.textContent, len = Math.max(from.length, to.length), frame = 0, total = 22;
-    (function step() {
-      var out = "";
-      for (var i = 0; i < len; i++) {
-        var reveal = frame / total * len;
-        if (i < reveal) out += to[i] || "";
-        else out += i < Math.max(to.length, 1) ? glyphs[Math.floor(Math.random() * glyphs.length)] : "";
+  function calcEx() {
+    if (!data.rates.length) {
+      if (exGo) exGo.href = botLink("ex");
+      return;
+    }
+    if (!rateOf(ex.code)) ex.code = data.rates[0].code;
+    var r = rateOf(ex.code);
+    var rate = ex.dir === "buy" ? r.sell : r.buy;
+    var amount = parseFloat(String(amountEl.value).replace(",", ".")) || 0;
+    unitBtn.textContent = ex.unit === "coin" ? r.code : "₸";
+    exLabel.textContent = (ex.dir === "buy" ? "Сколько купить" : "Сколько продать") + (ex.unit === "coin" ? "" : ", в тенге");
+    warnEl.hidden = true;
+    if (!rate) {
+      outEl.textContent = "нет"; rateEl.textContent = "нет";
+      warnEl.textContent = ex.dir === "buy" ? "Покупка " + r.code + " сейчас недоступна" : "Продажа " + r.code + " сейчас недоступна";
+      warnEl.hidden = false;
+    } else {
+      var kzt = ex.unit === "coin" ? amount * rate : amount;
+      var coins = ex.unit === "coin" ? amount : amount / rate;
+      rateEl.textContent = fmt(rate) + " ₸";
+      if (ex.unit === "coin") {
+        exOutLabel.textContent = ex.dir === "buy" ? "Вы платите" : "Вы получаете";
+        outEl.textContent = tenge(kzt);
+      } else {
+        exOutLabel.textContent = ex.dir === "buy" ? "Вы получите" : "Нужно продать";
+        outEl.textContent = fmt(coins, 2) + " " + r.code;
       }
-      el.textContent = out;
-      if (++frame <= total) requestAnimationFrame(step); else el.textContent = to;
-    })();
+      if (amount > 0 && kzt < data.min_order) {
+        warnEl.textContent = "Минимальный заказ " + tenge(data.min_order); warnEl.hidden = false;
+      } else if (r.min && coins < r.min && amount > 0) {
+        warnEl.textContent = "Минимум " + fmt(r.min) + " " + r.code; warnEl.hidden = false;
+      }
+    }
+    exGo.href = botLink("ex_" + r.code);
   }
 
-  function showLot(lot) {
-    scramble(nameEl, lot.name);
-    if (lotName) lotName.textContent = lot.name;
-    if (lotStatus) lotStatus.textContent = lot.status;
-    if (lotTon) countTo(lotTon, lot.ton);
-    deadline = Date.now() + (1 + Math.random() * 6) * 864e5;
-    if (lotBar) lotBar.style.width = (20 + Math.random() * 70) + "%";
-  }
+  $$("[data-ex-dir] button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      ex.dir = b.getAttribute("data-dir");
+      $$("[data-ex-dir] button").forEach(function (x) { x.classList.toggle("on", x === b); });
+      calcEx();
+    });
+  });
+  if (unitBtn) unitBtn.addEventListener("click", function () { ex.unit = ex.unit === "coin" ? "kzt" : "coin"; amountEl.value = ex.unit === "coin" ? 100 : 50000; calcEx(); });
+  if (amountEl) amountEl.addEventListener("input", calcEx);
 
-  function countTo(el, value, suffix) {
-    suffix = suffix || "";
-    var start = parseFloat(String(el.textContent).replace(/\s/g, "").replace(",", ".")) || 0;
-    if (el._raf) cancelAnimationFrame(el._raf);
-    if (reduce) { el.textContent = fmt(value) + suffix; return; }
-    var t0 = performance.now(), dur = 600;
-    (function step(now) {
-      var k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
-      el.textContent = fmt(Math.round(start + (value - start) * e)) + suffix;
-      if (k < 1) el._raf = requestAnimationFrame(step);
-    })(t0);
+  // ---------- звёзды ----------
+  var qtyInput = $("#qty"), range = $("[data-range]"), unitEl = $("[data-unit]"), sumEl = $("[data-sum]");
+  var tiersEl = $("[data-tiers]"), chipsEl = $("[data-chips]"), buyStars = $("[data-buy-stars]");
+  var MAX = 100000;
+  function minQty() { return Math.max(data.stars.min_qty || 0, data.stars.tiers[0][0]); }
+  function unitFor(q) {
+    var u = data.stars.tiers[0][1], idx = 0;
+    data.stars.tiers.forEach(function (t, i) { if (q >= t[0]) { u = t[1]; idx = i; } });
+    return [u, idx];
   }
-
-  if (lots.length) {
-    var li = 0;
-    showLot(lots[0]);
-    if (lots.length > 1) {
-      setInterval(function () {
-        if (document.hidden) return;
-        li = (li + 1) % lots.length;
-        showLot(lots[li]);
-      }, 4200);
+  var toRange = function (q) { return Math.round(Math.log(q / minQty()) / Math.log(MAX / minQty()) * 1000); };
+  var fromRange = function (v) {
+    var q = minQty() * Math.pow(MAX / minQty(), v / 1000), step = q < 1000 ? 10 : q < 10000 ? 50 : 500;
+    return Math.max(minQty(), Math.round(q / step) * step);
+  };
+  function renderTiers() {
+    if (tiersEl) {
+      tiersEl.textContent = "";
+      data.stars.tiers.forEach(function (t, i) {
+        var li = document.createElement("li"); li.setAttribute("data-tier", i);
+        var a = document.createElement("span"); a.textContent = "от " + fmt(t[0], 0) + " шт";
+        var b = document.createElement("b"); b.textContent = fmt(t[1]) + " ₸";
+        li.appendChild(a); li.appendChild(b); tiersEl.appendChild(li);
+      });
+    }
+    if (chipsEl) {
+      chipsEl.textContent = "";
+      [500, 1000, 2500, 5000, 10000, 25000].filter(function (v) { return v >= minQty(); }).forEach(function (v) {
+        var b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = fmt(v, 0); b.dataset.v = v;
+        b.addEventListener("click", function () { setQty(v, true); });
+        chipsEl.appendChild(b);
+      });
     }
   }
-  if (timerEl) {
-    setInterval(function () {
-      var s = Math.max(0, Math.floor((deadline - Date.now()) / 1000));
+  function setQty(q, outside) {
+    q = Math.max(minQty(), Math.min(MAX, Math.round(q) || minQty()));
+    var res = unitFor(q);
+    if (outside && qtyInput) qtyInput.value = q;
+    if (range) { if (outside || document.activeElement !== range) range.value = toRange(q); range.style.setProperty("--fill", range.value / 10 + "%"); }
+    if (unitEl) unitEl.textContent = fmt(res[0]) + " ₸";
+    if (sumEl) sumEl.textContent = tenge(res[0] * q);
+    $$("[data-tier]").forEach(function (el) { el.classList.toggle("on", +el.getAttribute("data-tier") === res[1]); });
+    $$("[data-chips] .chip").forEach(function (c) { c.classList.toggle("on", +c.dataset.v === q); });
+    if (buyStars) buyStars.href = botLink("stars_" + q);
+  }
+  if (qtyInput) {
+    qtyInput.addEventListener("input", function () { if (qtyInput.value) setQty(+qtyInput.value, false); });
+    qtyInput.addEventListener("blur", function () { setQty(+qtyInput.value || minQty(), true); });
+  }
+  if (range) range.addEventListener("input", function () { var q = fromRange(+range.value); if (qtyInput) qtyInput.value = q; setQty(q, false); });
+
+  // ---------- поиск юзернейма в реальном времени ----------
+  var form = $("[data-check]"), hint = $("[data-check-hint]"), result = $("[data-result]");
+  var STATUS = {
+    sale: ["Продаётся", "sale"], auction: ["Аукцион", "auction"], sold: ["Продан", "sold"], taken: ["Занят", "taken"],
+    free: ["Свободен или недоступен", "free"], notfound: ["Нет на Fragment", "notfound"], other: ["Fragment", "free"], unknown: ["Нет данных", ""]
+  };
+  var live = { name: "", timer: null, ends: 0, checked: 0 };
+
+  function showResult(j) {
+    var st = STATUS[j.status] || STATUS.unknown;
+    $("[data-r-name]").textContent = "@" + j.username;
+    var badge = $("[data-r-badge]"); badge.textContent = st[0]; badge.className = "badge " + st[1];
+    var price = "нет данных";
+    if (j.price_ton) price = fmt(j.price_ton) + " TON" + (data.ton_kzt ? " ≈ " + tenge(j.price_ton * data.ton_kzt) : "");
+    $("[data-r-price]").textContent = price;
+    live.ends = j.ends_at ? Date.parse(j.ends_at) || 0 : 0;
+    live.checked = Date.now();
+    $("[data-r-order]").href = botLink("un_" + j.username);
+    $("[data-r-fragment]").href = "https://fragment.com/username/" + encodeURIComponent(j.username);
+    result.hidden = false;
+    tick();
+  }
+  function tick() {
+    var t = $("[data-r-timer]");
+    if (live.ends) {
+      var s = Math.max(0, Math.floor((live.ends - Date.now()) / 1000));
       var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
       var p = function (n) { return (n < 10 ? "0" : "") + n; };
-      timerEl.textContent = d + "д " + p(h) + ":" + p(m) + ":" + p(sec);
-    }, 1000);
-  }
-
-  // ---------- бегущая строка ----------
-  var track = $("[data-ticker]");
-  if (track) {
-    var items = (cfg.ticker || []).map(function (t) { return "<span>" + t.replace(/[<>&]/g, "") + "</span>"; }).join("");
-    track.innerHTML = items + items;
-  }
-
-  // ---------- калькулятор звёзд ----------
-  var tiers = (cfg.stars || [[50, 9.5]]).slice().sort(function (a, b) { return a[0] - b[0]; });
-  var MIN = tiers[0][0], MAX = 100000;
-  var qtyInput = $("#qty"), range = $("[data-range]"), unitEl = $("[data-unit]"), sumEl = $("[data-sum]");
-  var tiersEl = $("[data-tiers]"), chipsEl = $("[data-chips]"), buy = $("[data-buy-stars]");
-
-  if (tiersEl) {
-    tiersEl.innerHTML = tiers.map(function (t, i) {
-      return '<li data-tier="' + i + '"><span>от ' + fmt(t[0]) + ' шт</span><b>' + fmt(t[1]) + " ₸</b></li>";
-    }).join("");
-  }
-  if (chipsEl) {
-    [100, 500, 1000, 2500, 5000, 10000].filter(function (v) { return v >= MIN; }).forEach(function (v) {
-      var b = document.createElement("button");
-      b.type = "button"; b.className = "chip"; b.textContent = fmt(v); b.dataset.v = v;
-      chipsEl.appendChild(b);
-    });
-    chipsEl.addEventListener("click", function (e) {
-      var v = e.target && e.target.dataset && e.target.dataset.v;
-      if (v) setQty(+v, true);
-    });
-  }
-
-  // логарифмическая шкала: удобно и для 50, и для 100 000
-  var toRange = function (q) { return Math.round(Math.log(q / MIN) / Math.log(MAX / MIN) * 1000); };
-  var fromRange = function (r) {
-    var q = MIN * Math.pow(MAX / MIN, r / 1000);
-    var step = q < 1000 ? 10 : q < 10000 ? 50 : 500;
-    return Math.max(MIN, Math.round(q / step) * step);
-  };
-  var unitFor = function (q) {
-    var u = tiers[0][1], idx = 0;
-    tiers.forEach(function (t, i) { if (q >= t[0]) { u = t[1]; idx = i; } });
-    return [u, idx];
-  };
-
-  function setQty(q, fromOutside) {
-    q = Math.max(MIN, Math.min(MAX, Math.round(q) || MIN));
-    var res = unitFor(q), unit = res[0];
-    if (fromOutside && qtyInput) qtyInput.value = q;
-    if (range) {
-      if (fromOutside || document.activeElement !== range) range.value = toRange(q);
-      range.style.setProperty("--fill", range.value / 10 + "%");
+      t.textContent = (d ? d + "д " : "") + p(h) + ":" + p(m) + ":" + p(sec);
+    } else {
+      t.textContent = "нет";
     }
-    if (unitEl) unitEl.textContent = fmt(unit) + " ₸";
-    if (sumEl) countTo(sumEl, Math.round(unit * q), " ₸");
-    $$("[data-tier]").forEach(function (el) { el.classList.toggle("on", +el.dataset.tier === res[1]); });
-    $$(".chip").forEach(function (c) { c.classList.toggle("on", +c.dataset.v === q); });
-    if (buy) buy.href = botLink("stars_" + q);
+    if (live.checked) {
+      var ago = Math.round((Date.now() - live.checked) / 1000);
+      $("[data-r-updated]").textContent = "Обновляется в реальном времени · проверено " + (ago < 5 ? "только что" : ago + " с назад");
+    }
   }
-
-  if (qtyInput) {
-    qtyInput.min = MIN;
-    qtyInput.addEventListener("input", function () { if (qtyInput.value) setQty(+qtyInput.value, false); });
-    qtyInput.addEventListener("blur", function () { setQty(+qtyInput.value || MIN, true); });
+  function check(name) {
+    return fetch("/api/username?u=" + encodeURIComponent(name), { credentials: "omit" })
+      .then(function (r) { return r.json().then(function (j) { return [r.status, j]; }); })
+      .then(function (res) {
+        if (res[0] === 429) { hint.textContent = "Слишком много запросов, подождите минуту."; return; }
+        if (res[0] !== 200) { hint.textContent = "Проверить не удалось, попробуйте позже или спросите в боте."; return; }
+        if (live.name === res[1].username) showResult(res[1]);
+      })
+      .catch(function () { hint.textContent = "Проверка работает на сайте с сервером. Откройте бота, он проверит юзер."; });
   }
-  if (range) range.addEventListener("input", function () { setQty(fromRange(+range.value), false); if (qtyInput) qtyInput.value = fromRange(+range.value); });
-  setQty(qtyInput ? +qtyInput.value : 500, true);
-
-  // ---------- проверка юзернейма ----------
-  var form = $("[data-check]"), hint = $("[data-check-hint]"), frag = $("[data-fragment]");
-  var USER_RE = /^[a-zA-Z][a-zA-Z0-9_]{3,31}$/;
   if (form) {
     var input = form.querySelector("input");
     var validate = function () {
-      var v = input.value.trim().replace(/^@/, "");
-      input.value = v;
-      form.classList.remove("ok", "bad");
-      if (!v) { hint.textContent = "Латиница, цифры и «_», от 4 до 32 символов."; frag.href = "https://fragment.com/"; return null; }
+      var v = input.value.trim().replace(/^@/, ""); input.value = v;
+      form.classList.remove("bad");
+      if (!v) { hint.textContent = "Латиница, цифры и «_», от 4 до 32 символов."; return null; }
       if (!USER_RE.test(v)) {
         form.classList.add("bad");
-        hint.textContent = /^[0-9_]/.test(v) ? "Юзернейм должен начинаться с буквы." :
-          v.length < 4 ? "Слишком коротко: нужно от 4 символов." : "Только латиница, цифры и «_».";
+        hint.textContent = /^[0-9_]/.test(v) ? "Юзернейм должен начинаться с буквы." : v.length < 4 ? "Нужно от 4 символов." : "Только латиница, цифры и «_».";
         return null;
       }
-      form.classList.add("ok");
-      hint.textContent = "Формат подходит. Бот проверит статус @" + v + " на Fragment.";
-      frag.href = "https://fragment.com/username/" + v.toLowerCase();
+      hint.textContent = "Ищу @" + v + " на Fragment...";
       return v.toLowerCase();
     };
-    input.addEventListener("input", validate);
+    input.addEventListener("input", function () { validate(); });
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var v = validate();
       if (!v) { input.focus(); return; }
-      if (cfg.bot) window.open(botLink("un_" + v), "_blank", "noopener");
+      live.name = v;
+      clearInterval(live.timer);
+      check(v).then(function () { if (live.name === v) hint.textContent = "Слежу за @" + v + ": обновление каждые 30 секунд."; });
+      live.timer = setInterval(function () { if (!document.hidden && live.name) check(live.name); }, 30000);
     });
+    setInterval(function () { if (!result.hidden) tick(); }, 1000);
   }
 
-  // ---------- терминал деплоя ----------
+  // ---------- терминал ----------
   var term = $("[data-term]");
   if (term) {
     var lines = [
-      ["cmd", "$ git clone ваш-проект && cd ваш-проект"],
-      ["", "Cloning into 'ваш-проект'... done."],
-      ["cmd", "$ docker compose up -d --build"],
-      ["ok", "✔ db       Started"],
-      ["ok", "✔ redis    Started"],
-      ["ok", "✔ bot      Started"],
-      ["cmd", "$ certbot --nginx -d example.kz"],
-      ["ok", "✔ SSL сертификат выпущен, автопродление включено"],
-      ["cmd", "$ ./backup.sh"],
-      ["ok", "✔ Бэкап базы сохранён"],
-      ["", "Готово, проект в продакшене."]
+      ["cmd", "$ git clone ваш-проект && cd ваш-проект"], ["", "Cloning into 'ваш-проект'... done."],
+      ["cmd", "$ docker compose up -d --build"], ["ok", "✔ db       Started"], ["ok", "✔ redis    Started"], ["ok", "✔ bot      Started"],
+      ["cmd", "$ certbot --nginx -d example.kz"], ["ok", "✔ SSL сертификат выпущен, автопродление включено"],
+      ["cmd", "$ ./backup.sh"], ["ok", "✔ Бэкап базы сохранён"], ["", "Готово, проект в продакшене."]
     ];
+    var add = function (cls, text) { var s = document.createElement("span"); if (cls) s.className = cls; s.textContent = text; term.appendChild(s); };
     var played = false;
     var play = function () {
       if (played) return; played = true;
-      if (reduce) {
-        term.innerHTML = lines.map(function (l) { return '<span class="' + l[0] + '">' + l[1] + "</span>"; }).join("\n");
-        return;
-      }
-      var li2 = 0, ci = 0, html = "";
-      (function type() {
-        if (li2 >= lines.length) { term.innerHTML = html + '<span class="caret"></span>'; return; }
-        var l = lines[li2];
-        if (l[0] !== "cmd") { html += '<span class="' + l[0] + '">' + l[1] + "</span>\n"; li2++; term.innerHTML = html; return setTimeout(type, 260); }
-        ci++;
-        term.innerHTML = html + '<span class="cmd">' + l[1].slice(0, ci) + '</span><span class="caret"></span>';
-        if (ci >= l[1].length) { html += '<span class="cmd">' + l[1] + "</span>\n"; li2++; ci = 0; return setTimeout(type, 380); }
-        setTimeout(type, 28 + Math.random() * 40);
+      if (reduce) { lines.forEach(function (l) { add(l[0], l[1] + "\n"); }); return; }
+      var li = 0;
+      (function next() {
+        if (li >= lines.length) { add("caret", ""); return; }
+        var l = lines[li++];
+        if (l[0] !== "cmd") { add(l[0], l[1] + "\n"); return setTimeout(next, 260); }
+        var span = document.createElement("span"); span.className = "cmd"; term.appendChild(span);
+        var ci = 0;
+        (function type() {
+          span.textContent = l[1].slice(0, ++ci);
+          if (ci < l[1].length) return setTimeout(type, 26 + Math.random() * 40);
+          span.textContent += "\n"; setTimeout(next, 380);
+        })();
       })();
     };
     if ("IntersectionObserver" in window) {
@@ -352,4 +388,14 @@
       tio.observe(term);
     } else play();
   }
+
+  // ---------- старт ----------
+  function render() {
+    applyLinks(); applyTexts(); renderRates(); renderCodes(); calcEx(); renderTiers();
+    setQty(qtyInput ? +qtyInput.value : 1000, true);
+  }
+  render();
+  loadSite().then(function (ok) { if (ok) render(); });
+  // курсы и тексты подтягиваются раз в минуту, пока вкладка открыта
+  setInterval(function () { if (!document.hidden) loadSite().then(function (ok) { if (ok) { renderRates(); renderCodes(); calcEx(); } }); }, 60000);
 })();

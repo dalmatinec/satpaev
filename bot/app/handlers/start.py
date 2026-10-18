@@ -40,6 +40,16 @@ async def deep_link(payload: str, message: Message, state: FSMContext, session: 
         if qty >= stars.min_qty():
             await stars.ask_recipient(message, state, user, qty)
             return True
+    if payload.startswith("ex_"):
+        from sqlalchemy import func, select
+
+        from ..db.models import Rate
+
+        code = payload[3:].upper()[:16]
+        r = await session.scalar(select(Rate).where(func.upper(Rate.code) == code, Rate.is_active.is_(True)))
+        if r:
+            await exchange.pair_view(message, r)
+            return True
     if payload.startswith("un_"):
         uname = clean_username(payload[3:])
         if uname:

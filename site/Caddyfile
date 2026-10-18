@@ -1,23 +1,30 @@
-# Пока домена нет, сайт работает по IP на 80 порту.
-# Когда появится домен, впишите его в .env (SITE_ADDRESS=example.kz) и перезапустите:
-# Caddy сам получит и будет продлевать SSL сертификат.
-{$SITE_ADDRESS::80} {
+# Адрес задаёт deploy.sh: домен (тогда SSL выпускается сам) или :порт.
+{$CADDY_ADDRESS::80} {
 	root * /srv
 	encode zstd gzip
-	file_server
 
 	header {
 		-Server
 		X-Content-Type-Options nosniff
-		X-Frame-Options SAMEORIGIN
 		Referrer-Policy strict-origin-when-cross-origin
-		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self' https://web.telegram.org https://*.telegram.org"
 	}
 
-	@html path / /index.html
-	header @html Cache-Control "no-cache"
+	# API бота (только чтение)
+	handle /api/* {
+		@notget not method GET
+		respond @notget 405
+		reverse_proxy {$API_UPSTREAM:http://127.0.0.1:8090} {
+			header_up X-Real-IP {remote_host}
+		}
+	}
 
-	@static path *.css *.js *.svg *.png *.jpg *.webp *.woff2
-	header @static Cache-Control "public, max-age=604800"
-
+	handle {
+		@html path / /index.html
+		header @html Cache-Control "no-cache"
+		@static path *.css *.js *.svg *.png *.jpg *.webp *.woff2
+		header @static Cache-Control "public, max-age=2592000, immutable"
+		file_server
+	}
 }

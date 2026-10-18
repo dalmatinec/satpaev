@@ -29,6 +29,9 @@ if [ -z "${SITE_ADDRESS:-}" ] || [ "${1:-}" = "domain" ]; then
   fi
   . ./.env
 fi
+# где работает бот: по умолчанию на этом же сервере
+API_UPSTREAM="${API_UPSTREAM:-http://127.0.0.1:${API_PORT:-8090}}"
+API_UPSTREAM="${API_UPSTREAM%/}"
 
 # свои данные сайта: не в git, обновления их не трогают
 if [ ! -f public/config.local.js ] || [ "${1:-}" = "config" ]; then
@@ -72,36 +75,58 @@ if systemctl is-active --quiet nginx 2>/dev/null; then
   else
     CONF_PATH=/etc/nginx/conf.d/${NGINX_CONF}
   fi
-  # если certbot уже вписал SSL в конфиг, не затираем его
-  if [ -f "${CONF_PATH}" ] && grep -q "managed by Certbot" "${CONF_PATH}" && grep -q "server_name ${NAME};" "${CONF_PATH}"; then
-    echo "Конфиг nginx с SSL уже есть, обновляю только файлы сайта."
-  else
-    cat > "${CONF_PATH}" <<NGINX
+  mkdir -p /etc/nginx/snippets
+
+  # заголовки безопасности (подключаются в каждый location, иначе nginx их теряет)
+  cat > /etc/nginx/snippets/satpaev-headers.conf <<'HDR'
+add_header X-Content-Type-Options nosniff always;
+add_header Referrer-Policy strict-origin-when-cross-origin always;
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+add_header Strict-Transport-Security "max-age=31536000" always;
+add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self' https://web.telegram.org https://*.telegram.org" always;
+HDR
+  # лимит запросов к API: 2 в секунду с одного IP, всплеск до 20
+  cat > /etc/nginx/conf.d/satpaev-ratelimit.conf <<'RL'
+limit_req_zone $binary_remote_addr zone=satpaev_api:10m rate=2r/s;
+RL
+
+  cat > "${CONF_PATH}" <<NGINX
 server {
     ${LISTEN}
     server_name ${NAME};
     root ${WEB_ROOT};
     index index.html;
-
     server_tokens off;
-    add_header X-Content-Type-Options nosniff always;
-    add_header X-Frame-Options SAMEORIGIN always;
-    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    client_max_body_size 16k;
 
     gzip on;
-    gzip_types text/css application/javascript image/svg+xml;
+    gzip_types text/css application/javascript application/json image/svg+xml;
 
+    # API бота (только чтение): курсы, цены, тексты, проверка юзернейма
+    location ^~ /api/ {
+        limit_req zone=satpaev_api burst=20 nodelay;
+        limit_req_status 429;
+        limit_except GET { deny all; }
+        proxy_pass ${API_UPSTREAM};
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 12s;
+        include /etc/nginx/snippets/satpaev-headers.conf;
+    }
+    location ~ /\.(?!well-known) { deny all; }
     location ~* \.(css|js|svg|png|jpg|webp|woff2)\$ {
-        expires 7d;
-        add_header Cache-Control "public";
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        include /etc/nginx/snippets/satpaev-headers.conf;
     }
     location / {
         add_header Cache-Control "no-cache";
+        include /etc/nginx/snippets/satpaev-headers.conf;
         try_files \$uri \$uri/ /index.html;
     }
 }
 NGINX
-  fi
   if [ -d /etc/nginx/sites-enabled ]; then ln -sf "${CONF_PATH}" /etc/nginx/sites-enabled/${NGINX_CONF}; fi
   nginx -t
   systemctl reload nginx
@@ -111,13 +136,17 @@ NGINX
       apt-get update -qq && apt-get install -y -qq certbot python3-certbot-nginx
     fi
     if [ -n "${SSL_EMAIL:-}" ]; then MAIL=(-m "${SSL_EMAIL}"); else MAIL=(--register-unsafely-without-email); fi
-    certbot --nginx -d "${SITE_ADDRESS}" --non-interactive --agree-tos "${MAIL[@]}" --redirect --keep-until-expiring
+    # --reinstall: если сертификат уже есть, он просто подключается к новому конфигу, без перевыпуска
+    certbot --nginx -d "${SITE_ADDRESS}" --non-interactive --agree-tos "${MAIL[@]}" --redirect --reinstall
     echo "✅ Сайт: https://${SITE_ADDRESS}  (сертификат продлевается сам)"
   else
     command -v ufw >/dev/null 2>&1 && ufw allow 8080/tcp >/dev/null 2>&1 || true
     echo "✅ Сайт: http://${IP}:8080"
     echo "   Для https без порта: ./deploy.sh domain"
   fi
+  curl -fsS -m 5 -o /dev/null "${API_UPSTREAM}/api/health" \
+    && echo "✅ Бот отдаёт данные сайту (курсы, цены, тексты)" \
+    || echo "⚠️ API бота не отвечает: обновите бота (cd ~/satpaev && git pull && docker compose up -d --build)"
   exit 0
 fi
 
@@ -139,6 +168,8 @@ if ! docker compose ps --status running -q web 2>/dev/null | grep -q . && port_b
   if port_busy 443; then set_env HTTPS_PORT 8443; fi
 fi
 command -v ufw >/dev/null 2>&1 && ufw allow "${HTTP_PORT}/tcp" >/dev/null 2>&1 || true
+set_env API_UPSTREAM "${API_UPSTREAM}"
+if [ -n "${SITE_ADDRESS:-}" ]; then set_env CADDY_ADDRESS "${SITE_ADDRESS}"; else set_env CADDY_ADDRESS ":${HTTP_PORT}"; fi
 docker compose up -d
 docker compose restart web >/dev/null
 docker compose ps

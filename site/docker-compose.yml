@@ -1,16 +1,15 @@
-# Сайт разворачивается отдельно от бота (можно на другом сервере), чтобы не светить IP бота.
+# Сайт без nginx на сервере: Caddy с автоматическим SSL.
+# Сеть хоста нужна, чтобы Caddy видел API бота на 127.0.0.1:8090.
 name: satpaev-site
 
 services:
   web:
     image: caddy:2-alpine
     restart: unless-stopped
+    network_mode: host
     environment:
-      # пустое значение Caddy не принимает, поэтому без домена слушаем просто :80
-      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
-    ports:
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
+      CADDY_ADDRESS: ${CADDY_ADDRESS:-:80}
+      API_UPSTREAM: ${API_UPSTREAM:-http://127.0.0.1:8090}
     volumes:
       - ./www:/srv:ro
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

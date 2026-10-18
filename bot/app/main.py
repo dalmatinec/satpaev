@@ -73,12 +73,19 @@ async def main() -> None:
             log.warning("Не удалось задать команды для %s: %s", admin_id, e)
     await media.verify(bot, sm)
     tick = asyncio.create_task(scheduler.run(bot, sm))
+    api = None
+    if config.api_port:
+        from . import web_api
+
+        api = await web_api.start(bot, sm, config.api_port)
     me = await bot.me()
     log.info("Бот @%s запущен", me.username)
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types(), sm=sm, handle_signals=True)
     finally:
         tick.cancel()
+        if api is not None:
+            await api.cleanup()
         await username_check.close()
         try:
             await dp.fsm.storage.close()

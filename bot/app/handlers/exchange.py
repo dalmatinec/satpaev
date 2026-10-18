@@ -53,19 +53,23 @@ async def nav_ex(cb: CallbackQuery, session: AsyncSession) -> None:
     await ex_view(cb, session)
 
 
-@router.callback_query(Shop.filter((F.sec == "ex") & (F.a == "pair")))
-async def pair(cb: CallbackQuery, callback_data: Shop, session: AsyncSession) -> None:
-    r = await session.get(Rate, callback_data.i)
-    if not r or not r.is_active:
-        await ex_view(cb, session)
-        return
+async def pair_view(target, r: Rate) -> None:
     rows = []
     if r.sell:
         rows.append([mbtn("ex_buy", Shop(sec="ex", a="dir", i=r.id, v="buy"), code=r.code, rate=num(r.sell))])
     if r.buy:
         rows.append([mbtn("ex_sell", Shop(sec="ex", a="dir", i=r.id, v="sell"), code=r.code, rate=num(r.buy))])
     rows.append([mbtn("back", Nav(to="ex"))])
-    await show(cb, t("ex_pair", code=h(r.code), line=rate_line(r)), kb(*rows), edit=("ex_pair", None))
+    await show(target, t("ex_pair", code=h(r.code), line=rate_line(r)), kb(*rows), edit=("ex_pair", None))
+
+
+@router.callback_query(Shop.filter((F.sec == "ex") & (F.a == "pair")))
+async def pair(cb: CallbackQuery, callback_data: Shop, session: AsyncSession) -> None:
+    r = await session.get(Rate, callback_data.i)
+    if not r or not r.is_active:
+        await ex_view(cb, session)
+        return
+    await pair_view(cb, r)
 
 
 @router.callback_query(Shop.filter((F.sec == "ex") & (F.a == "dir")))

@@ -60,6 +60,8 @@ async def tx_card(target, key: str) -> None:
         f"Переменные: <code>{h(variables)}</code>\n"
         f"Состояние: <b>{'изменён' if custom else 'стандартный'}</b>"
         + ("\n<i>Это всплывающее уведомление: без форматирования, до 200 символов.</i>" if spec.plain else "")
+        + ("\n<i>Текст сайта: показывается без форматирования, обновится на сайте в течение 20 секунд.</i>"
+           if spec.group == "site" else "")
         + "\n\n➖➖➖➖➖➖\n"
     )
     rows = [[btn("✏️ Изменить", Adm(s="tx", a="edit", v=key))]]

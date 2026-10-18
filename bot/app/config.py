@@ -43,6 +43,7 @@ class Config:
     backup_time: str
     backup_keep: int
     shared_dir: str
+    api_port: int
 
     @property
     def owner_id(self) -> int:
@@ -70,6 +71,7 @@ def load() -> Config:
         backup_time=os.getenv("BACKUP_TIME", "04:00").strip() or "04:00",
         backup_keep=max(1, int(os.getenv("BACKUP_KEEP", "1") or 1)),
         shared_dir=os.getenv("SHARED_DIR", "/shared"),
+        api_port=int(os.getenv("API_PORT", "0") or 0),
     )
 
 

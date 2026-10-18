@@ -3,199 +3,252 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Satpaev: звёзды, NFT подарки и юзернеймы Telegram</title>
-  <meta name="description" content="Звёзды Telegram оптом, NFT подарки, коллекционные юзернеймы через Fragment, обмен и разработка ботов. Заказ в Telegram боте.">
-  <meta name="theme-color" content="#08090d">
-  <meta property="og:title" content="Satpaev: звёзды, NFT подарки и юзернеймы Telegram">
-  <meta property="og:description" content="Звёзды оптом, NFT подарки, юзернеймы под заказ, обмен и разработка ботов.">
-  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <title>SatBox: криптообмен, звёзды, NFT подарки и юзернеймы Telegram</title>
+  <meta name="description" content="SatBox: криптообмен, звёзды Telegram оптом, NFT подарки, юзернеймы через Fragment, разработка ботов и сайтов. Всё в одном Telegram боте.">
+  <meta name="theme-color" content="#0a0614">
+  <meta property="og:title" content="SatBox: больше, чем просто сервис">
+  <meta property="og:description" content="Криптообмен, звёзды, NFT подарки, юзернеймы и разработка ботов.">
+  <link rel="icon" href="favicon.svg?v=__V__" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=__V__">
 </head>
 <body>
-  <!-- набор иконок: тонкая линия 1.5, один стиль на весь сайт -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <svg class="sprite" aria-hidden="true">
     <defs>
-      <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.6l2.55 5.17 5.7.83-4.13 4.02.98 5.68L12 16.62l-5.1 2.68.98-5.68L3.75 9.6l5.7-.83z"/></symbol>
-      <symbol id="i-gift" viewBox="0 0 24 24"><path d="M4.5 11.5h15V20a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z"/><path d="M3.5 7.5h17v4h-17z"/><path d="M12 7.5V21"/><path d="M12 7.5C10.6 4.4 7.2 3.9 7.2 5.9c0 1.7 2.7 1.6 4.8 1.6z"/><path d="M12 7.5c1.4-3.1 4.8-3.6 4.8-1.6 0 1.7-2.7 1.6-4.8 1.6z"/></symbol>
-      <symbol id="i-gem" viewBox="0 0 24 24"><path d="M6.5 4h11l3.5 5.2L12 20.5 3 9.2z"/><path d="M3 9.2h18"/><path d="M9.6 4 8 9.2l4 11.3 4-11.3L14.4 4"/></symbol>
       <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8.5h14"/><path d="M14.5 5 18 8.5 14.5 12"/><path d="M20 15.5H6"/><path d="M9.5 12 6 15.5 9.5 19"/></symbol>
-      <symbol id="i-code" viewBox="0 0 24 24"><path d="M8 7.5 3.5 12 8 16.5"/><path d="M16 7.5l4.5 4.5-4.5 4.5"/><path d="M13.6 5.5l-3.2 13"/></symbol>
       <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3.5 3 10.6l6.6 2.6 2.7 6.8z"/><path d="M9.6 13.2 21 3.5"/></symbol>
-      <symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.6"/><path d="M15.6 8.6v4.6a2.4 2.4 0 0 0 4.8 0V12a8.4 8.4 0 1 0-3.4 6.75"/></symbol>
+      <symbol id="i-gem" viewBox="0 0 24 24"><path d="M6.5 4h11l3.5 5.2L12 20.5 3 9.2z"/><path d="M3 9.2h18"/><path d="M9.6 4 8 9.2l4 11.3 4-11.3L14.4 4"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.6l2.55 5.17 5.7.83-4.13 4.02.98 5.68L12 16.62l-5.1 2.68.98-5.68L3.75 9.6l5.7-.83z"/></symbol>
+      <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.8 20c.8-3.6 3.6-5.6 7.2-5.6s6.4 2 7.2 5.6"/></symbol>
+      <symbol id="i-code" viewBox="0 0 24 24"><path d="M8 7.5 3.5 12 8 16.5"/><path d="M16 7.5l4.5 4.5-4.5 4.5"/><path d="M13.6 5.5l-3.2 13"/></symbol>
+      <symbol id="i-server" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="16" height="6.5" rx="1.6"/><path d="M7.5 7.25h.01M7.5 16.75h.01"/></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.5 2.5 5 13.5h6l-1 8 8.5-11h-6z"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 5.8v5.7c0 4.4 3 8 7 9.5 4-1.5 7-5.1 7-9.5V5.8z"/><path d="M9 12l2.2 2.2L15.5 10"/></symbol>
+      <symbol id="i-headset" viewBox="0 0 24 24"><path d="M4.5 14v-2a7.5 7.5 0 0 1 15 0v2"/><rect x="3.5" y="13.5" width="4" height="5.5" rx="1.4"/><rect x="16.5" y="13.5" width="4" height="5.5" rx="1.4"/><path d="M18.5 19c0 1.4-1.8 2-4 2h-1.5"/></symbol>
+      <symbol id="i-crown" viewBox="0 0 24 24"><path d="M4 8l4 4.5L12 6l4 6.5L20 8l-1.5 10h-13z"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/></symbol>
       <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10.5H9.5L5 19.5v-3.5H4z"/></symbol>
-      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M7 17 17 7"/><path d="M8.5 7H17v8.5"/></symbol>
+      <symbol id="i-ext" viewBox="0 0 24 24"><path d="M7 17 17 7"/><path d="M8.5 7H17v8.5"/></symbol>
+
+      <!-- логотип SatBox: шестигранник-куб с буквой S -->
+      <linearGradient id="lg-face-top" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c4b5fd" stop-opacity=".55"/><stop offset="1" stop-color="#7c3aed" stop-opacity=".25"/></linearGradient>
+      <linearGradient id="lg-face-left" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6d28d9" stop-opacity=".55"/><stop offset="1" stop-color="#312e81" stop-opacity=".35"/></linearGradient>
+      <linearGradient id="lg-face-right" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a855f7" stop-opacity=".5"/><stop offset="1" stop-color="#4c1d95" stop-opacity=".35"/></linearGradient>
+      <linearGradient id="lg-s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f5d0fe"/><stop offset=".45" stop-color="#d946ef"/><stop offset="1" stop-color="#6366f1"/></linearGradient>
+      <linearGradient id="lg-edge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset=".5" stop-color="#e9d5ff" stop-opacity=".25"/><stop offset="1" stop-color="#f0abfc" stop-opacity=".8"/></linearGradient>
+      <symbol id="logo" viewBox="0 0 200 220">
+        <polygon points="100,12 184,60 100,108 16,60" fill="url(#lg-face-top)"/>
+        <polygon points="16,60 100,108 100,208 16,160" fill="url(#lg-face-left)"/>
+        <polygon points="184,60 100,108 100,208 184,160" fill="url(#lg-face-right)"/>
+        <path d="M150 70 100 44 50 70v36l100 36v34l-50 26-50-26" fill="none" stroke="url(#lg-s)" stroke-width="22" stroke-linejoin="round" stroke-linecap="round"/>
+        <path d="M150 70 100 44 50 70v36l100 36v34l-50 26-50-26" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" transform="translate(-3 -4)"/>
+        <polygon points="100,12 184,60 184,160 100,208 16,160 16,60" fill="none" stroke="url(#lg-edge)" stroke-width="2.4" stroke-linejoin="round"/>
+      </symbol>
     </defs>
   </svg>
-  <!-- фон: звёзды на канвасе и плавающее сияние -->
-  <canvas class="sky" aria-hidden="true"></canvas>
-  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+
+  <!-- фон: светящиеся «жидкие» ленты и звёзды -->
+  <div class="bg" aria-hidden="true">
+    <svg class="ribbons" viewBox="0 0 1440 1000" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="rb1" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7c3aed"/><stop offset=".5" stop-color="#d946ef"/><stop offset="1" stop-color="#4f46e5"/></linearGradient>
+        <linearGradient id="rb2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4338ca"/><stop offset="1" stop-color="#a21caf"/></linearGradient>
+        <filter id="blur-xl" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="40"/></filter>
+        <filter id="blur-s" x="-10%" y="-50%" width="120%" height="200%"><feGaussianBlur stdDeviation="2.5"/></filter>
+      </defs>
+      <g class="rb rb-a" filter="url(#blur-xl)"><path d="M-200 220C120 40 380 380 720 260S1200 -40 1640 160" stroke="url(#rb1)" stroke-width="150" fill="none" opacity=".55"/></g>
+      <g class="rb rb-b" filter="url(#blur-xl)"><path d="M-160 900C200 700 520 980 860 820S1300 600 1620 780" stroke="url(#rb2)" stroke-width="170" fill="none" opacity=".5"/></g>
+      <g class="rb rb-c" filter="url(#blur-s)"><path d="M-100 160C200 30 380 330 700 250S1180 30 1560 140" stroke="#f0abfc" stroke-width="3" fill="none" opacity=".55"/></g>
+      <g class="rb rb-d" filter="url(#blur-s)"><path d="M-120 860C240 690 560 950 900 800S1320 640 1600 760" stroke="#c4b5fd" stroke-width="2.5" fill="none" opacity=".45"/></g>
+    </svg>
+    <canvas class="sky"></canvas>
+  </div>
   <div class="cursor-glow" aria-hidden="true"></div>
   <div class="progress" aria-hidden="true"></div>
 
   <header class="nav glass">
-    <a class="logo" href="#top" aria-label="На главную"><span class="logo-at">@</span><span data-brand>Satpaev</span></a>
+    <a class="brand" href="#top" aria-label="На главную">
+      <svg class="brand-mark" width="34" height="37"><use href="#logo"/></svg>
+      <span data-brand>SatBox</span>
+    </a>
     <nav class="nav-links" aria-label="Разделы">
-      <a href="#services">Услуги</a>
-      <a href="#calc">Звёзды</a>
+      <a href="#services">Сервисы</a>
+      <a href="#exchange">Обмен</a>
+      <a href="#stars">Звёзды</a>
       <a href="#check">Юзернеймы</a>
-      <a href="#dev">Разработка</a>
-      <a href="#faq">Вопросы</a>
+      <a href="#faq">FAQ</a>
     </nav>
-    <a class="btn btn-gold btn-sm magnetic" data-bot href="#"><svg class="i i-sm" width="17" height="17"><use href="#i-send"/></svg>Открыть бота</a>
+    <a class="btn btn-outline btn-sm" data-bot href="#"><svg class="i" width="18" height="18"><use href="#i-send"/></svg>Telegram</a>
   </header>
 
   <main id="top">
     <!-- ===== главный экран ===== -->
     <section class="hero">
       <div class="hero-copy reveal">
-        <p class="pill glass"><span class="dot"></span>Звёзды, NFT подарки, юзернеймы и обмен в Telegram</p>
-        <h1 class="handle" aria-label="Юзернейм">
-          <span class="handle-at">@</span><span class="handle-name" data-scramble>satpaev</span>
-        </h1>
-        <p class="hero-text">Займём нужный вам юзер, проведём через аукцион Fragment и передадим как NFT.
-          Звёзды оптом, подарки, обмен и разработка ботов. Всё в одном Telegram боте.</p>
-        <div class="hero-actions">
-          <a class="btn btn-gold magnetic" data-bot href="#"><svg class="i i-sm" width="17" height="17"><use href="#i-send"/></svg>Заказать в боте</a>
-          <a class="btn btn-glass magnetic" href="#check">Проверить юзер</a>
+        <p class="eyebrow"><span class="eyebrow-line"></span><span data-t="site_tagline">Цифровой сервис нового поколения</span></p>
+        <h1 class="hero-brand" data-brand>SatBox</h1>
+        <p class="hero-title" data-t="site_title">Больше, чем просто сервис.</p>
+        <p class="hero-lead" data-t="site_lead">Криптообмен, звёзды Telegram, NFT подарки, юзернеймы и разработка ботов. Всё в одном месте.</p>
+        <a class="btn btn-neon" data-bot href="#">
+          <svg class="i" width="20" height="20"><use href="#i-send"/></svg>
+          <span data-t="site_cta">Перейти в Telegram</span>
+          <svg class="i" width="18" height="18"><use href="#i-arrow"/></svg>
+        </a>
+      </div>
+
+      <div class="hero-logo" aria-hidden="true">
+        <div class="halo"></div>
+        <svg class="ring" viewBox="0 0 400 140">
+          <defs><linearGradient id="ring-g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6366f1"/><stop offset=".5" stop-color="#f0abfc"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs>
+          <ellipse cx="200" cy="70" rx="185" ry="52" fill="none" stroke="url(#ring-g)" stroke-width="10" opacity=".55"/>
+          <ellipse class="ring-spark" cx="200" cy="70" rx="185" ry="52" fill="none" stroke="#fff" stroke-width="1.5" opacity=".6" stroke-dasharray="140 900"/>
+        </svg>
+        <svg class="cube" viewBox="0 0 200 220"><use href="#logo"/></svg>
+      </div>
+
+      <aside class="services glass reveal" id="services" aria-label="Сервисы">
+        <a class="svc" data-bot-start="ex" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-swap"/></svg></span>
+          <span class="svc-t"><b>Криптообмен</b><small data-t="site_s_ex">USDT, TON и другие по курсу дня</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
+        <a class="svc" data-bot-start="stars" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-star"/></svg></span>
+          <span class="svc-t"><b>Stars</b><small data-t="site_s_stars">Оптом от 500 штук</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
+        <a class="svc" data-bot-start="gifts" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-gem"/></svg></span>
+          <span class="svc-t"><b>NFT и подарки</b><small data-t="site_s_gifts">Коллекционные NFT подарки</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
+        <a class="svc" data-bot-start="un" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-user"/></svg></span>
+          <span class="svc-t"><b>Юзернеймы</b><small data-t="site_s_un">Короткие и под заказ через Fragment</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
+        <a class="svc" data-bot-start="dev" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-code"/></svg></span>
+          <span class="svc-t"><b>Telegram боты</b><small data-t="site_s_dev">Разработка ботов и сайтов</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
+        <a class="svc" data-bot-start="dev" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-server"/></svg></span>
+          <span class="svc-t"><b>Сервера</b><small data-t="site_s_srv">Деплой, домен, SSL, Docker</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
+      </aside>
+    </section>
+
+    <section class="features">
+      <article class="feat glass reveal"><svg class="i" width="30" height="30"><use href="#i-bolt"/></svg>
+        <h3 data-t="site_f1_title">Быстро</h3><p data-t="site_f1_text">Заказ оформляется в боте за минуту, звёзды приходят до 3 часов.</p></article>
+      <article class="feat glass reveal"><svg class="i" width="30" height="30"><use href="#i-shield"/></svg>
+        <h3 data-t="site_f2_title">Безопасно</h3><p data-t="site_f2_text">Оплата после согласования цены, каждый этап виден в боте.</p></article>
+      <article class="feat glass reveal"><svg class="i" width="30" height="30"><use href="#i-headset"/></svg>
+        <h3 data-t="site_f3_title">На связи</h3><p data-t="site_f3_text">Менеджер отвечает прямо в Telegram.</p></article>
+      <article class="feat glass reveal"><svg class="i" width="30" height="30"><use href="#i-crown"/></svg>
+        <h3 data-t="site_f4_title">Удобно</h3><p data-t="site_f4_text">Заказы, статусы и отзывы в одном боте.</p></article>
+    </section>
+
+    <!-- ===== обмен ===== -->
+    <section id="exchange" class="section">
+      <h2 class="title reveal">Обмен</h2>
+      <p class="sub reveal" data-t="site_ex_text">Курс фиксирован на день. Сделка занимает от 5 до 30 минут.</p>
+      <div class="ex glass reveal">
+        <div class="ex-rates">
+          <div class="ex-head"><span>Валюта</span><span>Покупаем</span><span>Продаём</span></div>
+          <div data-rates><p class="muted pad">Загружаю курсы...</p></div>
+          <p class="live"><i></i>Курсы обновляются из бота автоматически</p>
+        </div>
+        <div class="ex-calc">
+          <div class="seg" data-ex-dir>
+            <button type="button" class="on" data-dir="buy">Купить</button>
+            <button type="button" data-dir="sell">Продать</button>
+          </div>
+          <div class="chips" data-ex-codes></div>
+          <label class="field">
+            <span data-ex-label>Сколько купить</span>
+            <span class="field-row">
+              <input class="field-input" type="number" inputmode="decimal" min="0" step="any" value="100" data-ex-amount aria-label="Сумма">
+              <button type="button" class="unit" data-ex-unit>USDT</button>
+            </span>
+          </label>
+          <div class="ex-out">
+            <div><small data-ex-out-label>Вы платите</small><b data-ex-out>0 ₸</b></div>
+            <div><small>Курс</small><b data-ex-rate>0 ₸</b></div>
+          </div>
+          <p class="warn" data-ex-warn hidden></p>
+          <a class="btn btn-neon btn-wide" data-ex-go href="#"><svg class="i" width="20" height="20"><use href="#i-swap"/></svg>Обменять в боте</a>
         </div>
       </div>
-
-      <div class="hero-stage" aria-hidden="true">
-        <div class="orb orb-1"><svg class="i" width="22" height="22"><use href="#i-gift"/></svg></div>
-        <div class="orb orb-2"><svg class="i" width="22" height="22"><use href="#i-star"/></svg></div>
-        <div class="orb orb-3"><svg class="i" width="22" height="22"><use href="#i-gem"/></svg></div>
-        <article class="lot glass tilt">
-          <div class="lot-shine"></div>
-          <header class="lot-head">
-            <span class="lot-label">Лот Fragment</span>
-            <span class="lot-status" data-lot-status>Передан клиенту</span>
-          </header>
-          <p class="lot-name">@<span data-lot-name>satpaev</span></p>
-          <div class="lot-row">
-            <div>
-              <span class="lot-k">Цена</span>
-              <span class="lot-ton"><span data-lot-ton>120</span> TON</span>
-            </div>
-            <div>
-              <span class="lot-k">До конца аукциона</span>
-              <span class="lot-timer" data-timer>6д 23:59:59</span>
-            </div>
-          </div>
-          <div class="lot-bar"><i data-lot-bar></i></div>
-        </article>
-      </div>
     </section>
 
-    <!-- ===== бегущая строка ===== -->
-    <div class="ticker glass" aria-hidden="true"><div class="ticker-track" data-ticker></div></div>
-
-    <!-- ===== услуги ===== -->
-    <section id="services" class="section">
-      <h2 class="title reveal">Что можно заказать</h2>
-      <div class="bento">
-        <a class="tile glass spot tilt reveal tile-wide" data-bot-start="stars" href="#">
-          <span class="tile-icon"><svg class="i" width="22" height="22"><use href="#i-star"/></svg></span>
-          <h3>Звёзды Telegram</h3>
-          <p>На любой аккаунт, от 500 штук. Чем больше объём, тем дешевле звезда. Выдача до 3 часов.</p>
-          <span class="tile-go">Купить звёзды<svg class="i i-sm" width="17" height="17"><use href="#i-arrow"/></svg></span>
-        </a>
-        <a class="tile glass spot tilt reveal" data-bot-start="gifts" href="#">
-          <span class="tile-icon"><svg class="i" width="22" height="22"><use href="#i-gift"/></svg></span>
-          <h3>NFT подарки</h3>
-          <p>Витрина с фото и ценой. Ищете редкую модель или фон? Подберём.</p>
-          <span class="tile-go">Смотреть витрину<svg class="i i-sm" width="17" height="17"><use href="#i-arrow"/></svg></span>
-        </a>
-        <a class="tile glass spot tilt reveal" data-bot-start="un" href="#">
-          <span class="tile-icon"><svg class="i" width="22" height="22"><use href="#i-gem"/></svg></span>
-          <h3>Юзернеймы</h3>
-          <p>Готовые красивые юзеры и поиск под заказ с передачей через Fragment.</p>
-          <span class="tile-go">Выбрать юзер<svg class="i i-sm" width="17" height="17"><use href="#i-arrow"/></svg></span>
-        </a>
-        <a class="tile glass spot tilt reveal" data-bot-start="ex" href="#">
-          <span class="tile-icon"><svg class="i" width="22" height="22"><use href="#i-swap"/></svg></span>
-          <h3>Обмен</h3>
-          <p>Курс на день фиксирован, сделка от 5 до 30 минут.</p>
-          <span class="tile-go">Узнать курс<svg class="i i-sm" width="17" height="17"><use href="#i-arrow"/></svg></span>
-        </a>
-        <a class="tile glass spot tilt reveal" data-bot-start="dev" href="#">
-          <span class="tile-icon"><svg class="i" width="22" height="22"><use href="#i-code"/></svg></span>
-          <h3>Боты и сайты</h3>
-          <p>Разработка под ключ, деплой на сервер, домен и SSL, поддержка.</p>
-          <span class="tile-go">Оставить заявку<svg class="i i-sm" width="17" height="17"><use href="#i-arrow"/></svg></span>
-        </a>
-      </div>
-    </section>
-
-    <!-- ===== калькулятор звёзд ===== -->
-    <section id="calc" class="section">
+    <!-- ===== звёзды ===== -->
+    <section id="stars" class="section">
+      <h2 class="title reveal">Звёзды Telegram</h2>
+      <p class="sub reveal">Минимальный заказ на любую услугу: <b data-min-order>10 000 ₸</b></p>
       <div class="calc glass reveal">
-        <div class="calc-copy">
-          <h2 class="title">Калькулятор звёзд</h2>
-          <p class="muted">Двигайте ползунок, итог считается сразу. Нажмите «Купить», бот откроется уже с этим количеством.</p>
-          <p class="calc-note">Минимальный заказ на любую услугу: <b data-min-order>10 000 ₸</b></p>
-          <ul class="tiers" data-tiers></ul>
-        </div>
         <div class="calc-box">
-          <label class="calc-label" for="qty">Количество звёзд</label>
-          <div class="calc-qty">
-            <input id="qty" class="calc-input" type="number" inputmode="numeric" min="500" max="100000" step="10" value="1000">
-            <svg class="i calc-star" width="30" height="30"><use href="#i-star"/></svg>
-          </div>
+          <label class="field">
+            <span>Количество звёзд</span>
+            <span class="field-row">
+              <input id="qty" class="field-input big" type="number" inputmode="numeric" min="500" max="100000" step="10" value="1000" aria-label="Количество звёзд">
+              <svg class="i star-ic" width="34" height="34"><use href="#i-star"/></svg>
+            </span>
+          </label>
           <input class="range" type="range" min="0" max="1000" value="300" aria-label="Количество звёзд" data-range>
           <div class="chips" data-chips></div>
-          <div class="calc-total">
-            <div><span class="lot-k">Цена звезды</span><b data-unit>20 ₸</b></div>
-            <div><span class="lot-k">Итого</span><b class="calc-sum" data-sum>20 000 ₸</b></div>
+        </div>
+        <div class="calc-side">
+          <ul class="tiers" data-tiers></ul>
+          <div class="ex-out">
+            <div><small>Цена звезды</small><b data-unit>20 ₸</b></div>
+            <div><small>Итого</small><b class="sum" data-sum>20 000 ₸</b></div>
           </div>
-          <a class="btn btn-gold btn-wide magnetic" data-buy-stars href="#">Купить в боте</a>
+          <a class="btn btn-neon btn-wide" data-buy-stars href="#"><svg class="i" width="20" height="20"><use href="#i-star"/></svg>Купить в боте</a>
         </div>
       </div>
     </section>
 
-    <!-- ===== проверка юзернейма ===== -->
+    <!-- ===== поиск юзернейма ===== -->
     <section id="check" class="section">
       <div class="check glass reveal">
-        <h2 class="title">Хотите конкретный юзер?</h2>
-        <p class="muted">Введите юзернейм: проверим формат, а бот посмотрит его статус на Fragment и примет заявку.</p>
-        <form class="check-form" data-check novalidate>
-          <svg class="i check-at" width="22" height="22"><use href="#i-at"/></svg>
-          <input class="check-input" name="u" placeholder="username" autocomplete="off" spellcheck="false" maxlength="32" aria-label="Юзернейм">
-          <button class="btn btn-gold magnetic" type="submit">Заказать</button>
+        <h2 class="title">Найдите свой юзернейм</h2>
+        <p class="sub" data-t="site_un_text">Введите юзернейм: покажем его статус на Fragment и будем обновлять в реальном времени.</p>
+        <form class="search" data-check novalidate>
+          <svg class="i" width="22" height="22"><use href="#i-search"/></svg>
+          <span class="at">@</span>
+          <input name="u" placeholder="username" autocomplete="off" spellcheck="false" maxlength="32" aria-label="Юзернейм">
+          <button class="btn btn-neon btn-sm" type="submit">Найти</button>
         </form>
-        <p class="check-hint" data-check-hint>Латиница, цифры и «_», от 4 до 32 символов.</p>
-        <div class="check-links">
-          <a class="link" data-fragment href="https://fragment.com/" target="_blank" rel="noopener">Открыть на Fragment</a>
+        <p class="hint" data-check-hint>Латиница, цифры и «_», от 4 до 32 символов.</p>
+        <div class="result" data-result hidden>
+          <div class="result-head">
+            <b class="result-name" data-r-name>@username</b>
+            <span class="badge" data-r-badge>...</span>
+          </div>
+          <div class="result-grid">
+            <div><small>Цена</small><b data-r-price>нет данных</b></div>
+            <div><small>До конца аукциона</small><b data-r-timer>нет</b></div>
+          </div>
+          <p class="live"><i></i><span data-r-updated>Обновляется в реальном времени</span></p>
+          <div class="result-actions">
+            <a class="btn btn-neon btn-sm" data-r-order href="#"><svg class="i" width="18" height="18"><use href="#i-send"/></svg>Заказать в боте</a>
+            <a class="btn btn-outline btn-sm" data-r-fragment href="https://fragment.com" target="_blank" rel="noopener noreferrer">Fragment<svg class="i" width="16" height="16"><use href="#i-ext"/></svg></a>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- ===== как проходит заказ юзера ===== -->
+    <!-- ===== этапы заказа юзера ===== -->
     <section class="section">
       <h2 class="title reveal">Как проходит заказ юзернейма</h2>
-      <ol class="steps" data-steps>
+      <ol class="steps">
         <li class="step glass reveal"><h3>Заявка</h3><p>Пишете в бота, какой юзер хотите. Бот проверит его на Fragment, менеджер назовёт цену.</p></li>
         <li class="step glass reveal"><h3>Юзер занят</h3><p>После оплаты закрепляем юзер за нами, чтобы его никто не забрал.</p></li>
-        <li class="step glass reveal"><h3>Аукцион</h3><p>Через неделю выставляем на аукцион Fragment и сопровождаем ставки.</p></li>
+        <li class="step glass reveal"><h3>Аукцион</h3><p>Выставляем на аукцион Fragment и сопровождаем ставки.</p></li>
         <li class="step glass reveal"><h3>Передача</h3><p>Юзер приходит к вам коллекционным NFT. Каждый этап видно в боте.</p></li>
       </ol>
     </section>
 
     <!-- ===== разработка ===== -->
     <section id="dev" class="section dev">
-      <div class="dev-copy reveal">
+      <div class="reveal">
         <h2 class="title">Боты, сайты и сервера под ключ</h2>
-        <p class="muted">Пишу Telegram ботов, сайты и Mini App. Разворачиваю на сервере, настраиваю домен, SSL, Docker
-          и базы данных, ставлю бэкапы и слежу, чтобы всё работало.</p>
+        <p class="sub">Telegram боты, сайты и Mini App. Деплой на сервер, домен и SSL, Docker, базы данных, бэкапы и поддержка.</p>
         <ul class="dev-list">
           <li><b>Telegram боты</b><span>магазины, обменники, CRM, рассылки</span></li>
           <li><b>Сайты и лендинги</b><span>от дизайна до запуска на домене</span></li>
           <li><b>Mini App</b><span>витрины и кабинеты внутри Telegram</span></li>
           <li><b>Сервер под ключ</b><span>VPS, Docker, PostgreSQL, SSL, бэкапы</span></li>
         </ul>
-        <a class="btn btn-glass magnetic" data-bot-start="dev" href="#">Обсудить проект</a>
+        <a class="btn btn-outline" data-bot-start="dev" href="#"><svg class="i" width="18" height="18"><use href="#i-chat"/></svg>Обсудить проект</a>
       </div>
       <div class="term glass reveal" aria-label="Пример деплоя">
         <div class="term-bar"><i></i><i></i><i></i><span>deploy</span></div>
@@ -210,35 +263,35 @@
         <details class="glass reveal"><summary>Как оплатить заказ?</summary>
           <p>Оформляете заказ в боте, менеджер присылает реквизиты прямо в чат. После оплаты нажимаете «Я оплатил», и заказ уходит в работу.</p></details>
         <details class="glass reveal"><summary>Есть минимальная сумма заказа?</summary>
-          <p>Да, минимальный заказ на любую услугу 10 000 ₸. Для звёзд это от 500 штук.</p></details>
+          <p>Да, минимальный заказ на любую услугу <span data-min-order>10 000 ₸</span>.</p></details>
         <details class="glass reveal"><summary>Сколько ждать звёзды?</summary>
-          <p>Обычно быстрее, но мы обещаем не дольше 3 часов с момента оплаты.</p></details>
+          <p>Не дольше 3 часов с момента оплаты, обычно быстрее.</p></details>
         <details class="glass reveal"><summary>Что если юзер, который я хочу, уже занят?</summary>
-          <p>Бот покажет его статус на Fragment. Если юзер продаётся или на аукционе, поможем купить. Если занят, предложим похожие варианты.</p></details>
-        <details class="glass reveal"><summary>Можно ли следить за заказом?</summary>
-          <p>Да, в разделе «Мои заказы» видно статус и каждый этап, а бот присылает уведомления.</p></details>
-        <details class="glass reveal"><summary>Есть реферальная программа?</summary>
-          <p>Да. Приглашайте друзей по своей ссылке из бота и получайте процент с их заказов.</p></details>
+          <p>Поиск выше покажет его статус на Fragment. Если юзер продаётся или на аукционе, поможем купить. Если занят, предложим похожие.</p></details>
+        <details class="glass reveal"><summary>Можно следить за заказом?</summary>
+          <p>Да, в разделе «Мои заказы» в боте виден статус и каждый этап, бот присылает уведомления.</p></details>
       </div>
     </section>
 
     <section class="section">
       <div class="cta glass reveal">
+        <svg class="cta-logo" width="84" height="92" aria-hidden="true"><use href="#logo"/></svg>
         <h2 class="title">Всё оформляется в боте</h2>
-        <p class="muted">Выберите услугу, бот посчитает цену и передаст заказ менеджеру.</p>
+        <p class="sub">Выберите услугу, бот посчитает цену и передаст заказ менеджеру.</p>
         <div class="cta-actions">
-          <a class="btn btn-gold magnetic" data-bot href="#"><svg class="i i-sm" width="17" height="17"><use href="#i-send"/></svg>Открыть бота</a>
-          <a class="btn btn-glass magnetic" data-manager href="#" hidden><svg class="i i-sm" width="17" height="17"><use href="#i-chat"/></svg>Написать <span data-manager-name></span></a>
+          <a class="btn btn-neon" data-bot href="#"><svg class="i" width="20" height="20"><use href="#i-send"/></svg>Открыть бота</a>
+          <a class="btn btn-outline" data-manager href="#" hidden><svg class="i" width="18" height="18"><use href="#i-chat"/></svg>Написать <span data-manager-name></span></a>
         </div>
       </div>
     </section>
   </main>
 
   <footer class="foot">
-    <span>© <span data-year>2026</span> <span data-brand>Satpaev</span></span>
+    <span><b data-brand>SatBox</b> © <span data-year>2026</span>. <span data-t="site_footer">Все права защищены.</span></span>
     <span class="foot-links">
-      <a class="link" data-manager href="#" hidden>Менеджер <span data-manager-name></span></a>
-      <a class="link" data-channel href="#" hidden>Наш канал</a>
+      <a data-bot href="#">Telegram</a>
+      <a data-manager href="#" hidden>Менеджер <span data-manager-name></span></a>
+      <a data-channel href="#" hidden>Канал</a>
     </span>
   </footer>
 

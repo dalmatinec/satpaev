@@ -61,6 +61,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       BACKUP_DIR: /backups
       SHARED_DIR: /shared
+      API_PORT: "8090"
+    # API для сайта: только для этого сервера, сайт ходит через nginx
+    ports:
+      - "127.0.0.1:8090:8090"
     volumes:
       - ./backups:/backups
       - ./data/shared:/shared
