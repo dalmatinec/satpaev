@@ -19,6 +19,12 @@ router = Router(name="exchange")
 t = settings.t
 
 
+def min_deal(r: Rate) -> Decimal:
+    """Минимальная сделка в ₸: своя у валюты (поле «Минимум») или общий минимальный заказ, что больше."""
+    own = Decimal(str(r.min_qty)) if r.min_qty else Decimal(0)
+    return max(own, settings.min_order())
+
+
 def fee() -> Decimal:
     """Фиксированный сбор за сделку обмена в тенге (0 = без сбора)."""
     try:
@@ -109,7 +115,7 @@ async def direction(cb: CallbackQuery, callback_data: Shop, session: AsyncSessio
     await state.set_state(ExSt.amount)
     await state.update_data(rate_id=r.id, dir=callback_data.v)
     verb = "купить" if callback_data.v == "buy" else "продать"
-    min_txt = f"\nМинимум: {num(r.min_qty)} {h(r.code)}" if r.min_qty else ""
+    min_txt = f"\nМинимальная сделка: {money(min_deal(r))}"
     await show(cb, t("ex_amount", code=h(r.code), verb=verb, min=min_txt),
                kb([mbtn("back", Shop(sec="ex", a="pair", i=r.id))]), edit=("ex_amount", None))
 
@@ -142,12 +148,9 @@ async def amount_input(message: Message, state: FSMContext, session: AsyncSessio
         qty = value
     gross = round_up(qty * rate)
     kzt = gross + f if buy else gross - f
-    if r.min_qty and qty < r.min_qty:
-        await say(message, t("ex_min", min=num(r.min_qty), code=h(r.code)))
-        return
-    # минимальный заказ: при покупке считаем всё, что платит клиент, при продаже сумму по курсу
-    if (kzt if buy else gross) < settings.min_order() or kzt <= 0:
-        await say(message, t("min_order", min=money(settings.min_order())))
+    # минимальная сделка в тенге: при покупке считаем всё, что платит клиент, при продаже сумму по курсу
+    if (kzt if buy else gross) < min_deal(r) or kzt <= 0:
+        await say(message, t("min_order", min=money(min_deal(r))))
         return
     await state.update_data(qty=str(qty), kzt=str(kzt), rate=str(rate), fee=str(f), gross=str(gross))
     await state.set_state(ExSt.confirm)

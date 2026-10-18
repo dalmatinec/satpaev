@@ -65,7 +65,7 @@ async def rate_card(target, session: AsyncSession, rate_id: int) -> None:
         f"💱 <b>{h(r.code)}</b>\n\n"
         f"🔴 Покупка (у клиента): <b>{num(r.buy)} ₸</b>\n"
         f"🟢 Продажа (клиенту): <b>{num(r.sell)} ₸</b>\n"
-        f"📦 Минимум: <b>{num(r.min_qty)}</b>\n"
+        f"📦 Минимальная сделка: <b>{money(r.min_qty) if r.min_qty else 'общий минимум ' + money(settings.min_order())}</b>\n"
         f"👁 Видимость: <b>{'показывается' if r.is_active else 'скрыта'}</b>"
     )
     await show(target, text, kb(
@@ -87,8 +87,10 @@ async def on_rates(cb: CallbackQuery, callback_data: Adm, session: AsyncSession,
         await ask(cb, state, "rate_add", "➕ Введите код валюты, например <code>USDT</code>, <code>BTC</code>, <code>RUB</code>:",
                   Adm(s="rates"))
     elif a in ("buy", "sell", "min"):
-        label = {"buy": "курс покупки у клиента", "sell": "курс продажи клиенту", "min": "минимальное количество"}[a]
-        await ask(cb, state, "rate_field", f"✏️ Введите {label} в ₸ (или «-», чтобы убрать):", back, rate_id=rid, field=a)
+        label = {"buy": "курс покупки у клиента за 1 монету, в ₸", "sell": "курс продажи клиенту за 1 монету, в ₸",
+                 "min": "минимальную сумму сделки по этой валюте в ₸, например <code>15000</code>"}[a]
+        await ask(cb, state, "rate_field", f"✏️ Введите {label}. «-» уберёт значение"
+                  + (" (тогда действует общий минимальный заказ)." if a == "min" else "."), back, rate_id=rid, field=a)
     elif a == "toggle":
         r = await session.get(Rate, rid)
         if r:
@@ -262,6 +264,7 @@ async def stars_view(target, session: AsyncSession, cbd: Adm) -> None:
             [btn("⏱ Срок подарков", Adm(s="stars", a="sla", v="sla_gifts")),
              btn("⏱ Срок Premium", Adm(s="stars", a="sla", v="sla_premium"))],
             [btn("👑 Цены Premium", Adm(s="stars", a="prem")), btn("💵 Курс $", Adm(s="stars", a="prem_usd"))],
+            [btn("📢 Пост: звёзды", Adm(s="stars", a="post_stars")), btn("📢 Пост: Premium", Adm(s="stars", a="post_prem"))],
             [btn("⚙️ Админка", Adm(s="menu"))],
         ),
     )
@@ -279,6 +282,14 @@ async def on_stars(cb: CallbackQuery, callback_data: Adm, session: AsyncSession,
         await ask(cb, state, "star_presets", "✏️ Пришлите количества для кнопок через пробел:\n<code>50 100 250 500 1000 2500 5000</code>", back)
     elif callback_data.a == "sla" and callback_data.v in ("sla_stars", "sla_exchange", "sla_gifts", "sla_premium"):
         await ask(cb, state, "sla", "⏱ Введите срок текстом, например «от 15 минут до 3 часов»:", back, key=callback_data.v)
+    elif callback_data.a in ("post_stars", "post_prem"):
+        from .channel import start_text_post
+
+        if callback_data.a == "post_stars":
+            text, ents = await posting.stars_post(cb.bot)
+        else:
+            text, ents = await posting.premium_post(cb.bot, session)
+        await start_text_post(cb, state, session, text, ents, back, "👀 <b>Пост в канал</b>")
     elif callback_data.a == "prem":
         await ask(cb, state, "premium_plans",
                   "👑 Пришлите тарифы Premium: каждая строка «месяцев» и «цена в $».\n\n"

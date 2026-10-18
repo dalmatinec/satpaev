@@ -155,6 +155,80 @@ async def rates_post(session: AsyncSession, bot: Bot) -> tuple[str, list[dict]]:
     return fill_template(template, ents, values)
 
 
+# ---------------- посты товаров: подарок, юзер, звёзды, Premium ----------------
+
+def _render(*parts) -> tuple[str, list[dict]]:
+    from aiogram.utils.formatting import Text
+
+    text, ents = Text(*parts).render()
+    return text, [e.model_dump(exclude_none=True) for e in (ents or [])]
+
+
+async def _deep(bot: Bot, start: str) -> str:
+    me = await bot.me()
+    return f"https://t.me/{me.username}?start={start}"
+
+
+def _kzt(value) -> str:
+    return money(value).replace(".", ",")
+
+
+async def item_post(bot: Bot, item) -> tuple[str, list[dict]]:
+    """Пост о подарке или готовом юзернейме. Ссылка ведёт прямо на карточку в боте."""
+    from aiogram.utils.formatting import Bold, TextLink
+
+    if item.kind == "uname":
+        from ..handlers.admin.catalog import ready_price
+
+        price_ton, price_kzt = ready_price(item)
+        price = f"{price_ton} TON" + (f" (≈ {_kzt(price_kzt)})" if price_kzt else "")
+        head, label, start = ["💎 Юзернейм ", Bold(f"@{item.title}")], "🛒 Купить в боте", "un"
+        sla = str(settings.get("sla_gifts") or "")
+    else:
+        price = _kzt(item.price) if item.price else (item.price_text or "по запросу")
+        head, label, start = ["🎁 ", Bold(item.title)], "🛒 Купить в боте", f"gift_{item.id}"
+        sla = str(settings.get("sla_gifts") or "")
+    parts = [*head, "\n"]
+    if item.description:
+        parts += ["\n", item.description[:600], "\n"]
+    parts += ["\n💰 Цена: ", Bold(price), "\n"]
+    if sla:
+        parts += ["⏱ Передача: ", sla, "\n"]
+    parts += ["\n", TextLink(label, url=await _deep(bot, start))]
+    return _render(*parts)
+
+
+async def stars_post(bot: Bot) -> tuple[str, list[dict]]:
+    from aiogram.utils.formatting import Bold, TextLink
+
+    lines = []
+    for q, p in settings.star_tiers():
+        lines.append(f"🔹 от {num(q)} шт: {num(p).replace('.', ',')} ₸ за звезду\n")
+    return _render(
+        "⭐ ", Bold("Telegram Stars"), "\n\n", "Чем больше берёте, тем дешевле звезда:\n", *lines, "\n",
+        "⏱ Выдача: ", str(settings.get("sla_stars") or ""), "\n",
+        "📦 Минимальный заказ: ", Bold(_kzt(settings.min_order())), "\n\n",
+        TextLink("🛒 Купить звёзды в боте", url=await _deep(bot, "stars")),
+    )
+
+
+async def premium_post(bot: Bot, session: AsyncSession) -> tuple[str, list[dict]]:
+    from aiogram.utils.formatting import Bold, TextLink
+
+    from ..handlers import premium
+
+    await premium.refresh_rate(session)
+    lines = []
+    for m, usd in premium.plans():
+        kzt = premium.price_kzt(usd)
+        lines.append(f"🔹 {premium.period(m)}: {num(usd)} $" + (f" · {_kzt(kzt)}" if kzt else "") + "\n")
+    return _render(
+        "👑 ", Bold("Telegram Premium"), "\n\n", "Подключим вам или в подарок другу. Вход в аккаунт не нужен, только юзернейм.\n\n",
+        *lines, "\n", "⏱ Подключение: ", str(settings.get("sla_premium") or ""), "\n\n",
+        TextLink("👑 Подключить в боте", url=await _deep(bot, "premium")),
+    )
+
+
 # ---------------- мультипостинг ----------------
 
 MEDIA_EXT = {"photo": ".jpg", "video": ".mp4", "animation": ".mp4", "document": ""}

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...catalog import DEV_CATS, FIELD_NAMES, FIELDS, KIND_NAMES
 from ...cb import Adm, AIn
 from ...db.models import Item
-from ...services import settings
+from ...services import posting, settings
 from ...states import AdmSt
 from ...ui import btn, kb, pager, say, show
 from ...utils import clean_username, h, money, num, parse_number
@@ -90,6 +90,8 @@ async def card(target, session: AsyncSession, item_id: int) -> None:
     b.adjust(2)
     b.row(btn("🙈 Скрыть" if it.is_active else "👁 Показать", Adm(s="cat", a="toggle", i=it.id)),
           btn("🔼 Выше", Adm(s="cat", a="up", i=it.id)))
+    if it.kind in ("gift", "uname") and it.is_active:
+        b.row(btn("📢 Пост в канал", Adm(s="cat", a="post", i=it.id), style="primary"))
     b.row(btn("🗑 Удалить", Adm(s="cat", a="del", i=it.id)))
     b.row(btn("◀️ К списку", Adm(s="cat", v=it.kind)))
     await show(target, "\n".join(lines), b.as_markup(), photo=it.photo or None)
@@ -227,6 +229,12 @@ async def on_catalog(cb: CallbackQuery, callback_data: Adm, session: AsyncSessio
         await view(cb, session, Adm(s="cat", v=callback_data.v))
         return
     back = Adm(s="cat", a="card", i=it.id)
+    if a == "post" and it.kind in ("gift", "uname"):
+        from .channel import start_text_post
+
+        text, ents = await posting.item_post(cb.bot, it)
+        await start_text_post(cb, state, session, text, ents, back, "👀 <b>Пост в канал</b>", photo=it.photo or None)
+        return
     if a == "edit" and callback_data.v in FIELD_NAMES:
         spec = next((f for f in FIELDS[it.kind] if f[0] == callback_data.v), None)
         if not spec:

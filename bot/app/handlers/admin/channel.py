@@ -283,19 +283,27 @@ async def post_ok(cb: CallbackQuery, state: FSMContext, session: AsyncSession, s
 
 
 async def start_text_post(cb: CallbackQuery, state: FSMContext, session: AsyncSession, text: str,
-                          ents: list[dict] | None, back: Adm, title: str, history: dict | None = None) -> None:
-    """Готовый текст (например, курсы на сегодня): превью и выбор, куда отправить."""
+                          ents: list[dict] | None, back: Adm, title: str, history: dict | None = None,
+                          photo: str | None = None) -> None:
+    """Готовый пост (курсы, подарок, звёзды, Premium): превью и выбор, куда отправить."""
     await show(cb, title)
+
+    async def _send(entities):
+        if photo:
+            return await cb.bot.send_photo(cb.from_user.id, photo, caption=text[:1024],
+                                           caption_entities=entities_from_store(entities), parse_mode=None)
+        return await cb.bot.send_message(cb.from_user.id, text, entities=entities_from_store(entities), parse_mode=None)
+
     try:
-        msg = await cb.bot.send_message(cb.from_user.id, text, entities=entities_from_store(ents), parse_mode=None)
+        msg = await _send(ents)
     except TelegramBadRequest:
         ents = strip_custom_emoji(ents)
-        msg = await cb.bot.send_message(cb.from_user.id, text, entities=entities_from_store(ents), parse_mode=None)
+        msg = await _send(ents)
     msg = msg.as_(cb.bot)
     await state.set_state(AdmSt.post_confirm)
     await state.set_data({
-        "from_chat": msg.chat.id, "msg_id": msg.message_id, "text": text, "entities": ents or [],
-        "file_id": None, "kind": "", "name": "", "account_ok": True, "photo": None,
+        "from_chat": msg.chat.id, "msg_id": msg.message_id, "text": text[:1024] if photo else text, "entities": ents or [],
+        "file_id": photo, "kind": "photo" if photo else "", "name": "", "account_ok": True, "photo": photo,
         "opts": await _options(session, cb.bot), "back": back.pack(), "history": history,
     })
     await _targets_screen(msg, state)

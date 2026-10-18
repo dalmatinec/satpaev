@@ -273,11 +273,10 @@
           (buy ? " = к оплате " : " = вы получаете "), { b: tenge(Math.max(total, 0)) }]);
         feeRow.hidden = false;
       }
-      var base = buy ? total : gross;
-      if (amount > 0 && (base < data.min_order || total <= 0)) {
-        warnEl.textContent = "Минимальный заказ " + tenge(data.min_order); warnEl.hidden = false;
-      } else if (r.min && coins < r.min && amount > 0) {
-        warnEl.textContent = "Минимум " + fmt(r.min) + " " + r.code; warnEl.hidden = false;
+      // минимальная сделка в тенге: своя у валюты или общий минимальный заказ
+      var base = buy ? total : gross, minDeal = Math.max(data.min_order || 0, r.min || 0);
+      if (amount > 0 && (base < minDeal || total <= 0)) {
+        warnEl.textContent = "Минимальная сделка " + tenge(minDeal); warnEl.hidden = false;
       }
     }
     exGo.href = botLink("ex_" + r.code);

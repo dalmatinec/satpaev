@@ -48,6 +48,16 @@ async def gift_page(target, session: AsyncSession, page: int) -> None:
     await show(target, text, screen_kb("gift", buttons, top=top), photo=item.photo or None, edit=("gift_card", "gift"))
 
 
+async def gift_by_id(target, session: AsyncSession, item_id: int) -> bool:
+    """Ссылка из поста в канале ведёт сразу на этот подарок."""
+    base = (Item.kind == "gift") & Item.is_active.is_(True)
+    ids = (await session.execute(select(Item.id).where(base).order_by(Item.sort, Item.id.desc()).limit(500))).scalars().all()
+    if item_id not in ids:
+        return False
+    await gift_page(target, session, ids.index(item_id))
+    return True
+
+
 @router.callback_query(Nav.filter(F.to == "gifts"))
 async def nav_gifts(cb: CallbackQuery, session: AsyncSession) -> None:
     await gift_page(cb, session, 0)

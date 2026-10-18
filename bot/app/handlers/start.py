@@ -83,6 +83,11 @@ async def deep_link(payload: str, message: Message, state: FSMContext, session: 
         if qty >= stars.min_qty():
             await stars.ask_recipient(message, state, user, qty)
             return True
+    if payload.startswith("gift_") and payload[5:].isdigit():
+        if await gifts.gift_by_id(message, session, int(payload[5:])):
+            return True
+        await gifts.gift_page(message, session, 0)
+        return True
     if payload.startswith("premium_") and payload[8:].isdigit():
         await premium.refresh_rate(session)
         if await premium.ask_recipient(message, state, user, int(payload[8:])):
