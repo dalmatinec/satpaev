@@ -79,9 +79,9 @@
     <nav class="nav-links" aria-label="Разделы">
       <a href="#services">Сервисы</a>
       <a href="#exchange">Обмен</a>
+      <a href="#check">Юзернеймы</a>
       <a href="#premium">Premium</a>
       <a href="#stars">Звёзды</a>
-      <a href="#check">Юзернеймы</a>
       <a href="#faq">FAQ</a>
     </nav>
     <a class="btn btn-outline btn-sm" data-bot href="#"><svg class="i" width="18" height="18"><use href="#i-send"/></svg>Telegram</a>
@@ -115,14 +115,14 @@
       <aside class="services glass reveal" id="services" aria-label="Сервисы">
         <a class="svc" data-bot-start="ex" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-swap"/></svg></span>
           <span class="svc-t"><b>Криптообмен</b><small data-t="site_s_ex">USDT, TON и другие по курсу дня</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
+        <a class="svc" data-bot-start="un" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-user"/></svg></span>
+          <span class="svc-t"><b>Юзернеймы</b><small data-t="site_s_un">Короткие и под заказ через Fragment</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
         <a class="svc" data-bot-start="premium" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-crown"/></svg></span>
           <span class="svc-t"><b>Telegram Premium</b><small data-t="site_s_premium">3, 6 или 12 месяцев, без входа в аккаунт</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
         <a class="svc" data-bot-start="stars" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-star"/></svg></span>
           <span class="svc-t"><b>Stars</b><small data-t="site_s_stars">Оптом от 500 штук</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
         <a class="svc" data-bot-start="gifts" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-gem"/></svg></span>
           <span class="svc-t"><b>NFT и подарки</b><small data-t="site_s_gifts">Коллекционные NFT подарки</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
-        <a class="svc" data-bot-start="un" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-user"/></svg></span>
-          <span class="svc-t"><b>Юзернеймы</b><small data-t="site_s_un">Короткие и под заказ через Fragment</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
         <a class="svc" data-bot-start="dev" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-code"/></svg></span>
           <span class="svc-t"><b>Telegram боты</b><small data-t="site_s_dev">Разработка ботов и сайтов</small></span><svg class="i svc-go" width="18" height="18"><use href="#i-arrow"/></svg></a>
         <a class="svc" data-bot-start="dev" href="#"><span class="svc-ic"><svg class="i" width="22" height="22"><use href="#i-server"/></svg></span>
@@ -176,40 +176,6 @@
       </div>
     </section>
 
-    <!-- ===== Telegram Premium ===== -->
-    <section id="premium" class="section">
-      <h2 class="title reveal">Telegram Premium</h2>
-      <p class="sub reveal" data-t="site_premium_text">Подключим Premium вам или в подарок другу. Нужен только юзернейм.</p>
-      <div class="plans" data-premium></div>
-    </section>
-
-    <!-- ===== звёзды ===== -->
-    <section id="stars" class="section">
-      <h2 class="title reveal">Звёзды Telegram</h2>
-      <p class="sub reveal">Минимальный заказ на любую услугу: <b data-min-order>10 000 ₸</b></p>
-      <div class="calc glass reveal">
-        <div class="calc-box">
-          <label class="field">
-            <span>Количество звёзд</span>
-            <span class="field-row">
-              <input id="qty" class="field-input big" type="number" inputmode="numeric" min="500" max="100000" step="10" value="1000" aria-label="Количество звёзд">
-              <svg class="i star-ic" width="34" height="34"><use href="#i-star"/></svg>
-            </span>
-          </label>
-          <input class="range" type="range" min="0" max="1000" value="300" aria-label="Количество звёзд" data-range>
-          <div class="chips" data-chips></div>
-        </div>
-        <div class="calc-side">
-          <ul class="tiers" data-tiers></ul>
-          <div class="ex-out">
-            <div><small>Цена звезды</small><b data-unit>20 ₸</b></div>
-            <div><small>Итого</small><b class="sum" data-sum>20 000 ₸</b></div>
-          </div>
-          <a class="btn btn-neon btn-wide" data-buy-stars href="#"><svg class="i" width="20" height="20"><use href="#i-star"/></svg>Купить в боте</a>
-        </div>
-      </div>
-    </section>
-
     <!-- ===== поиск юзернейма ===== -->
     <section id="check" class="section">
       <div class="check glass reveal">
@@ -249,6 +215,40 @@
         <li class="step glass reveal"><h3>Аукцион</h3><p>Выставляем на аукцион Fragment и сопровождаем ставки.</p></li>
         <li class="step glass reveal"><h3>Передача</h3><p>Юзер приходит к вам коллекционным NFT. Каждый этап видно в боте.</p></li>
       </ol>
+    </section>
+
+    <!-- ===== Telegram Premium ===== -->
+    <section id="premium" class="section">
+      <h2 class="title reveal">Telegram Premium</h2>
+      <p class="sub reveal" data-t="site_premium_text">Подключим Premium вам или в подарок другу. Нужен только юзернейм.</p>
+      <div class="plans" data-premium></div>
+    </section>
+
+    <!-- ===== звёзды ===== -->
+    <section id="stars" class="section">
+      <h2 class="title reveal">Звёзды Telegram</h2>
+      <p class="sub reveal">Минимальный заказ на любую услугу: <b data-min-order>10 000 ₸</b></p>
+      <div class="calc glass reveal">
+        <div class="calc-box">
+          <label class="field">
+            <span>Количество звёзд</span>
+            <span class="field-row">
+              <input id="qty" class="field-input big" type="number" inputmode="numeric" min="500" max="100000" step="10" value="1000" aria-label="Количество звёзд">
+              <svg class="i star-ic" width="34" height="34"><use href="#i-star"/></svg>
+            </span>
+          </label>
+          <input class="range" type="range" min="0" max="1000" value="300" aria-label="Количество звёзд" data-range>
+          <div class="chips" data-chips></div>
+        </div>
+        <div class="calc-side">
+          <ul class="tiers" data-tiers></ul>
+          <div class="ex-out">
+            <div><small>Цена звезды</small><b data-unit>20 ₸</b></div>
+            <div><small>Итого</small><b class="sum" data-sum>20 000 ₸</b></div>
+          </div>
+          <a class="btn btn-neon btn-wide" data-buy-stars href="#"><svg class="i" width="20" height="20"><use href="#i-star"/></svg>Купить в боте</a>
+        </div>
+      </div>
     </section>
 
     <!-- ===== разработка ===== -->
