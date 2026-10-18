@@ -155,9 +155,13 @@ def _hidden(screen: str) -> list[str]:
     return [k for k in _allowed(screen) if k not in shown and k != "app"]
 
 
-def _preview_btn(key: str, screen: str):
+def _preview_btn(key: str, screen: str, sel: str | None = None):
+    """Кнопка в редакторе экрана: нажатие выбирает её, выбранная отмечена 👉."""
     spec = settings.button(key)
-    return btn(spec["text"][:60], Adm(s="bt", a="card", v=key, i=_sidx(screen)),
+    text = strip_html(spec["text"])
+    if key == sel:
+        text = "👉 " + text
+    return btn(text[:60], Adm(s="bt", a="sel", v=key, i=_sidx(screen)),
                icon=spec["icon"] or None, style=spec["style"] or None)
 
 
@@ -209,27 +213,43 @@ async def bt_view(target, session: AsyncSession, cbd: Adm) -> None:
     ))
 
 
-async def screen_editor(target, screen: str) -> None:
+async def screen_editor(target, screen: str, sel: str | None = None) -> None:
     name, _, nav = SCREENS[screen]
-    rows = [[_preview_btn(k, screen) for k in row] for row in settings.layout(screen)]
-    hidden = _hidden(screen)
-    if hidden:
-        rows.append([btn("➖ скрытые кнопки ➖", Adm(s="bt", a="scr", v=screen))])
-        for key in hidden:
-            rows.append([btn(f"👁 Показать «{strip_html(settings.button(key)['text'])}»",
-                             Adm(s="bt", a="unhide", v=key, i=_sidx(screen)))])
-    rows.append([btn("📐 Раскладка текстом", Adm(s="bt", a="layout", v=screen)),
-                 btn("♻️ Сбросить", Adm(s="bt", a="layout_reset", v=screen))])
-    rows.append([btn("👁 Посмотреть экран", Nav(to=nav))])
-    rows.append([btn("◀️ Кнопки", Adm(s="bt"))])
-    extra = "\nТовары, валюты и листалка стоят над этими кнопками и не двигаются." if screen not in FREE else (
-        "\nКнопки можно переносить между главным меню и вкладкой «Ещё»: скройте здесь и покажите там." )
-    await show(
-        target,
-        f"📐 <b>{name}</b>\n\nСверху кнопки в том порядке, как их видит клиент. "
-        f"Нажмите на кнопку: переименовать, иконка, цвет, передвинуть.{extra}",
-        kb(*rows),
-    )
+    idx = _sidx(screen)
+    layout = settings.layout(screen)
+    if sel and not any(sel in row for row in layout):
+        sel = None
+    rows = [[_preview_btn(k, screen, sel) for k in row] for row in layout]
+    if sel:
+        # пульт выбранной кнопки: двигаете и сразу видите результат сверху
+        rows.append([btn("⬅️", Adm(s="bt", a="smv_l", v=sel, i=idx)), btn("⬆️", Adm(s="bt", a="smv_u", v=sel, i=idx)),
+                     btn("⬇️", Adm(s="bt", a="smv_d", v=sel, i=idx)), btn("➡️", Adm(s="bt", a="smv_r", v=sel, i=idx))])
+        line = [btn("↕️ Отдельно", Adm(s="bt", a="ssolo", v=sel, i=idx))]
+        if screen in FREE:
+            line.append(btn("🙈 Скрыть", Adm(s="bt", a="hide", v=sel, i=idx)))
+        rows.append(line)
+        rows.append([btn("✏️ Текст, иконка, цвет", Adm(s="bt", a="card", v=sel, i=idx)),
+                     btn("✅ Готово", Adm(s="bt", a="scr", v=screen))])
+    else:
+        hidden = _hidden(screen)
+        if hidden:
+            rows.append([btn("➖ скрытые кнопки ➖", Adm(s="bt", a="scr", v=screen))])
+            for key in hidden:
+                rows.append([btn(f"👁 Показать «{strip_html(settings.button(key)['text'])}»"[:60],
+                                 Adm(s="bt", a="unhide", v=key, i=idx))])
+        rows.append([btn("📐 Раскладка текстом", Adm(s="bt", a="layout", v=screen)),
+                     btn("♻️ Сбросить", Adm(s="bt", a="layout_reset", v=screen))])
+        rows.append([btn("👁 Посмотреть экран", Nav(to=nav)), btn("◀️ Кнопки", Adm(s="bt"))])
+    if sel:
+        hint = (f"Выбрана: <b>{h(strip_html(settings.button(sel)['text']))}</b>\n"
+                "Стрелки двигают её, порядок сверху меняется сразу. Нажмите другую кнопку, чтобы выбрать её.")
+    else:
+        hint = "Нажмите на кнопку, чтобы выбрать её: появятся стрелки для перемещения."
+        if screen in FREE:
+            hint += "\nКнопки можно переносить между главным меню и вкладкой «Ещё»: скройте здесь и покажите там."
+        else:
+            hint += "\nТовары, валюты и листалка стоят над этими кнопками и не двигаются."
+    await show(target, f"📐 <b>{name}</b>\n\n{hint}", kb(*rows))
 
 
 async def bt_card(target, key: str, screen: str | None = None) -> None:
@@ -251,16 +271,9 @@ async def bt_card(target, key: str, screen: str | None = None) -> None:
     rows.append([btn("🎨 Цвет", Adm(s="bt", a="style", v=key, i=idx)), btn("♻️ Сбросить", Adm(s="bt", a="reset", v=key, i=idx))])
     if screen:
         shown = any(key in row for row in settings.layout(screen))
-        if shown:
-            rows.append([btn("⬅️", Adm(s="bt", a="mv_l", v=key, i=idx)), btn("⬆️", Adm(s="bt", a="mv_u", v=key, i=idx)),
-                         btn("⬇️", Adm(s="bt", a="mv_d", v=key, i=idx)), btn("➡️", Adm(s="bt", a="mv_r", v=key, i=idx))])
-            line = [btn("↕️ Отдельной строкой", Adm(s="bt", a="solo", v=key, i=idx))]
-            if screen in FREE:
-                line.append(btn("🙈 Скрыть", Adm(s="bt", a="hide", v=key, i=idx)))
-            rows.append(line)
-        elif screen in FREE:
+        if not shown and screen in FREE:
             rows.append([btn("👁 Показать здесь", Adm(s="bt", a="unhide", v=key, i=idx))])
-    back = Adm(s="bt", a="scr", v=screen) if screen else Adm(s="bt", a="grp", v=BUTTONS[key][0])
+    back = Adm(s="bt", a="sel", v=key, i=idx) if screen else Adm(s="bt", a="grp", v=BUTTONS[key][0])
     rows.append([btn("◀️ Назад", back)])
     await show(target, text, kb(*rows))
 
@@ -270,6 +283,9 @@ def _find(layout: list[list[str]], key: str) -> tuple[int, int]:
         if key in row:
             return r, row.index(key)
     return -1, -1
+
+
+ROW_MAX = 2  # стрелками в ряд собирается не больше двух кнопок (текстом можно больше)
 
 
 def _move(layout: list[list[str]], key: str, action: str) -> list[list[str]]:
@@ -285,15 +301,26 @@ def _move(layout: list[list[str]], key: str, action: str) -> list[list[str]]:
     elif action == "mv_r" and c < len(row) - 1:
         row[c + 1], row[c] = row[c], row[c + 1]
     elif action == "mv_u":
+        # вверх: в соседний ряд, если там одна кнопка; иначе отдельным рядом выше (по две в ряд максимум)
         row.pop(c)
-        if r > 0 and len(layout[r - 1]) < 8:
+        alone = not row
+        if r > 0 and len(layout[r - 1]) < ROW_MAX:
             layout[r - 1].append(key)
-        else:
+        elif not alone:
             layout.insert(r, [key])
+        elif r > 0:
+            layout.insert(r - 1, [key])
+        else:
+            layout.insert(0, [key])
     elif action == "mv_d":
         row.pop(c)
-        if r + 1 < len(layout) and len(layout[r + 1]) < 8:
+        alone = not row
+        if r + 1 < len(layout) and len(layout[r + 1]) < ROW_MAX:
             layout[r + 1].insert(0, key)
+        elif not alone:
+            layout.insert(r + 1, [key])
+        elif r + 1 < len(layout):
+            layout.insert(r + 2, [key])
         else:
             layout.insert(r + 1, [key])
     elif action == "solo" and len(row) > 1:
@@ -314,6 +341,17 @@ async def on_bt(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, st
         await session.commit()
         await answer(cb, "Режим редактирования включён: откройте любой экран бота" if on else "Режим редактирования выключен", alert=on)
         await bt_view(cb, session, Adm(s="bt"))
+    elif a == "sel" and screen and key in _allowed(screen):
+        await screen_editor(cb, screen, key)
+    elif a in ("smv_l", "smv_r", "smv_u", "smv_d", "ssolo") and screen and key in _allowed(screen):
+        action = a[1:] if a != "ssolo" else "solo"
+        new = _move(settings.layout(screen), key, action)
+        if new != settings.layout(screen):
+            await settings.set_layout(session, screen, new)
+            await session.commit()
+        else:
+            await answer(cb, "Дальше некуда")
+        await screen_editor(cb, screen, key)
     elif a in ("mv_l", "mv_r", "mv_u", "mv_d", "solo", "hide", "unhide") and screen and key in _allowed(screen):
         if a in ("hide", "unhide") and screen not in FREE:
             await bt_card(cb, key, screen)
