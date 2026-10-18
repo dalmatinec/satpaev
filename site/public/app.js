@@ -20,6 +20,11 @@
   if (year) year.textContent = new Date().getFullYear();
   var channel = $("[data-channel]");
   if (channel && cfg.channel) { channel.href = cfg.channel; channel.hidden = false; }
+  var manager = String(cfg.manager || "").replace(/^@/, "");
+  if (manager) {
+    $$("[data-manager]").forEach(function (a) { a.href = "https://t.me/" + manager; a.hidden = false; });
+    $$("[data-manager-name]").forEach(function (el) { el.textContent = "@" + manager; });
+  }
 
   var fmt = function (n) {
     var parts = String(Math.round(n * 100) / 100).split(".");

@@ -209,17 +209,24 @@
       <div class="cta glass reveal">
         <h2 class="title">Всё оформляется в боте</h2>
         <p class="muted">Выберите услугу, бот посчитает цену и передаст заказ менеджеру.</p>
-        <a class="btn btn-gold magnetic" data-bot href="#">Открыть бота</a>
+        <div class="cta-actions">
+          <a class="btn btn-gold magnetic" data-bot href="#">Открыть бота</a>
+          <a class="btn btn-glass magnetic" data-manager href="#" hidden>Написать <span data-manager-name></span></a>
+        </div>
       </div>
     </section>
   </main>
 
   <footer class="foot">
     <span>© <span data-year>2026</span> <span data-brand>Satpaev</span></span>
-    <a class="link" data-channel href="#" hidden>Наш канал</a>
+    <span class="foot-links">
+      <a class="link" data-manager href="#" hidden>Менеджер <span data-manager-name></span></a>
+      <a class="link" data-channel href="#" hidden>Наш канал</a>
+    </span>
   </footer>
 
   <script src="config.js"></script>
+  <script src="config.local.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

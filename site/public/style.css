@@ -241,6 +241,8 @@ a { color: inherit; }
 .cta .title { margin-left: auto; margin-right: auto; }
 .cta .muted { margin: -10px auto 28px; max-width: 46ch; }
 
+.cta-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+.foot-links { display: flex; flex-wrap: wrap; gap: 20px; }
 .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 40px var(--gutter) 32px; color: var(--muted); font-size: .9375rem; }
 
 /* ---------- появление при прокрутке (один спокойный эффект) ---------- */
