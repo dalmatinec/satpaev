@@ -12,7 +12,7 @@ from ..services import media, settings
 from ..services.orders import client_order_kb, create_order, created_text
 from ..states import DevSt
 from ..texts import strip_html
-from ..ui import back_menu, btn, kb, mbtn, screen_kb, show
+from ..ui import back_menu, btn, kb, mbtn, say, screen_kb, show
 from ..utils import h
 
 router = Router(name="dev")
@@ -115,7 +115,7 @@ async def brief_start(cb: CallbackQuery, callback_data: Shop, session: AsyncSess
 async def brief_task(message: Message, state: FSMContext) -> None:
     text = (message.text or message.caption or "").strip()
     if len(text) < 5:
-        await message.answer(t("dev_task_short"))
+        await say(message, t("dev_task_short"))
         return
     await state.update_data(task=text[:2000])
     await state.set_state(DevSt.budget)
@@ -175,4 +175,4 @@ async def brief_ok(cb: CallbackQuery, state: FSMContext, session: AsyncSession, 
         lines.append(["Услуга", d["service"]])
     lines += [["Задача", d["task"]], ["Бюджет", d.get("budget", "")], ["Сроки", d.get("deadline", "")]]
     order = await create_order(session, cb.bot, user, "dev", d.get("service") or "Заявка на разработку", lines, None)
-    await show(cb, created_text(order), client_order_kb(order))
+    await show(cb, created_text(order), client_order_kb(order), keep=True)

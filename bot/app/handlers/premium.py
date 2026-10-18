@@ -14,7 +14,7 @@ from ..db.models import Rate, User
 from ..services import media, settings
 from ..services.orders import client_order_kb, create_order, created_text
 from ..states import PremSt
-from ..ui import back_menu, kb, mbtn, screen_kb, show
+from ..ui import back_menu, kb, mbtn, say, screen_kb, show
 from ..utils import clean_username, h, money, num, round_up
 
 router = Router(name="premium")
@@ -150,7 +150,7 @@ async def recipient_me(cb: CallbackQuery, state: FSMContext, user: User) -> None
 async def input_recipient(message: Message, state: FSMContext) -> None:
     uname = clean_username(message.text)
     if not uname:
-        await message.answer(t("stars_bad_recipient"))
+        await say(message, t("stars_bad_recipient"))
         return
     await confirm(message, state, uname)
 
@@ -174,4 +174,4 @@ async def place(cb: CallbackQuery, state: FSMContext, session: AsyncSession, use
         session, cb.bot, user, "premium", f"Premium {period(months)} для @{recipient}",
         details, kzt, {"months": months, "usd": str(usd), "recipient": recipient},
     )
-    await show(cb, created_text(order), client_order_kb(order))
+    await show(cb, created_text(order), client_order_kb(order), keep=True)

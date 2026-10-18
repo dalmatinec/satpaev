@@ -12,7 +12,7 @@ from ..db.models import Rate, User
 from ..services import media, settings
 from ..services.orders import client_order_kb, create_order, created_text
 from ..states import ExSt
-from ..ui import back_menu, kb, mbtn, screen_kb, show
+from ..ui import back_menu, kb, mbtn, say, screen_kb, show
 from ..utils import h, is_tenge_input, money, num, parse_number, round_up
 
 router = Router(name="exchange")
@@ -120,12 +120,12 @@ async def amount_input(message: Message, state: FSMContext, session: AsyncSessio
     r = await session.get(Rate, int(data.get("rate_id") or 0))
     value = parse_number(message.text)
     if not r or value is None:
-        await message.answer(t("ex_bad_amount"))
+        await say(message, t("ex_bad_amount"))
         return
     side = data.get("dir")
     rate = r.sell if side == "buy" else r.buy
     if not rate:
-        await message.answer(t("ex_unavailable"))
+        await say(message, t("ex_unavailable"))
         return
     rate = Decimal(str(rate))
     f = fee()
@@ -135,7 +135,7 @@ async def amount_input(message: Message, state: FSMContext, session: AsyncSessio
         total = round_up(value)
         gross = total - f if buy else total + f
         if gross <= 0:
-            await message.answer(t("min_order", min=money(settings.min_order())))
+            await say(message, t("min_order", min=money(settings.min_order())))
             return
         qty = (gross / rate).quantize(Decimal("0.01"))
     else:
@@ -143,11 +143,11 @@ async def amount_input(message: Message, state: FSMContext, session: AsyncSessio
     gross = round_up(qty * rate)
     kzt = gross + f if buy else gross - f
     if r.min_qty and qty < r.min_qty:
-        await message.answer(t("ex_min", min=num(r.min_qty), code=h(r.code)))
+        await say(message, t("ex_min", min=num(r.min_qty), code=h(r.code)))
         return
     # минимальный заказ: при покупке считаем всё, что платит клиент, при продаже сумму по курсу
     if (kzt if buy else gross) < settings.min_order() or kzt <= 0:
-        await message.answer(t("min_order", min=money(settings.min_order())))
+        await say(message, t("min_order", min=money(settings.min_order())))
         return
     await state.update_data(qty=str(qty), kzt=str(kzt), rate=str(rate), fee=str(f), gross=str(gross))
     await state.set_state(ExSt.confirm)
@@ -183,4 +183,4 @@ async def place(cb: CallbackQuery, state: FSMContext, session: AsyncSession, use
         session, cb.bot, user, "exchange", f"{op} {num(qty)} {r.code}", details,
         kzt, {"code": r.code, "dir": data.get("dir"), "qty": str(qty), "rate": str(rate), "fee": str(f)},
     )
-    await show(cb, created_text(order), client_order_kb(order))
+    await show(cb, created_text(order), client_order_kb(order), keep=True)

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...cb import Adm
 from ...db.models import Rate
 from ...services import posting, settings
-from ...ui import btn, kb, show
+from ...ui import btn, kb, say, show
 from ...utils import Rich, entities_from_store, h, money, num, parse_number, rich_store
 from .common import Ctx, ask, op, screen
 
@@ -144,7 +144,7 @@ async def on_rates(cb: CallbackQuery, callback_data: Adm, session: AsyncSession,
 async def op_rate_add(ctx: Ctx) -> None:
     code = re.sub(r"[^A-Za-z0-9]", "", ctx.text or "").upper()[:16]
     if not code:
-        await ctx.target.answer("Код из латинских букв, например <code>USDT</code>:")
+        await say(ctx.target, "Код из латинских букв, например <code>USDT</code>:")
         return
     await ctx.state.clear()
     sort = (await ctx.session.scalar(select(func.max(Rate.sort)))) or 0
@@ -159,7 +159,7 @@ async def op_rate_field(ctx: Ctx) -> None:
     raw = (ctx.text or "").strip()
     value = None if raw == "-" else parse_number(raw)
     if raw != "-" and value is None:
-        await ctx.target.answer("Нужно число, например <code>471.5</code>, или «-»:")
+        await say(ctx.target, "Нужно число, например <code>471.5</code>, или «-»:")
         return
     await ctx.state.clear()
     r = await ctx.session.get(Rate, int(ctx.data["rate_id"]))
@@ -174,7 +174,7 @@ async def op_rate_field(ctx: Ctx) -> None:
 async def op_set_ton(ctx: Ctx) -> None:
     value = parse_number(ctx.text)
     if value is None:
-        await ctx.target.answer("Нужно число, например <code>1450</code>:")
+        await say(ctx.target, "Нужно число, например <code>1450</code>:")
         return
     await ctx.state.clear()
     await settings.put(ctx.session, "ton_kzt", float(value))
@@ -278,7 +278,7 @@ async def op_tiers(ctx: Ctx) -> None:
             if q > 0 and p > 0:
                 tiers.append([q, p])
     if not tiers:
-        await ctx.target.answer("Не нашёл ни одной строки. Формат: <code>50 9.5</code>")
+        await say(ctx.target, "Не нашёл ни одной строки. Формат: <code>50 9.5</code>")
         return
     await ctx.state.clear()
     await settings.put(ctx.session, "star_tiers", sorted(tiers))
@@ -290,7 +290,7 @@ async def op_tiers(ctx: Ctx) -> None:
 async def op_presets(ctx: Ctx) -> None:
     values = sorted({int(x) for x in re.findall(r"\d+", ctx.text or "") if 0 < int(x) <= 1_000_000})
     if not values:
-        await ctx.target.answer("Пришлите числа через пробел:")
+        await say(ctx.target, "Пришлите числа через пробел:")
         return
     await ctx.state.clear()
     await settings.put(ctx.session, "star_presets", values[:12])
@@ -301,7 +301,7 @@ async def op_presets(ctx: Ctx) -> None:
 @op("sla")
 async def op_sla(ctx: Ctx) -> None:
     if not ctx.text:
-        await ctx.target.answer("Введите текст:")
+        await say(ctx.target, "Введите текст:")
         return
     await ctx.state.clear()
     await settings.put(ctx.session, ctx.data["key"], ctx.text.strip()[:100])
@@ -322,7 +322,7 @@ async def op_premium_plans(ctx: Ctx) -> None:
             if 0 < m <= 60 and usd > 0:
                 rows.append([m, usd])
     if not rows:
-        await ctx.target.answer("Не нашёл ни одной строки. Формат: <code>3 17</code>")
+        await say(ctx.target, "Не нашёл ни одной строки. Формат: <code>3 17</code>")
         return
     await ctx.state.clear()
     await settings.put(ctx.session, "premium_plans", sorted(rows)[:6])

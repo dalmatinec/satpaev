@@ -12,7 +12,7 @@ from ..db.models import Item, User
 from ..services import media, settings, username_check
 from ..services.orders import client_order_kb, create_order, created_text
 from ..states import BuySt, UnSt
-from ..ui import back_menu, kb, mbtn, pager, screen_kb, show
+from ..ui import back_menu, kb, mbtn, pager, say, screen_kb, show
 from ..utils import clean_username, h, money, num, round_up
 
 router = Router(name="usernames")
@@ -108,7 +108,7 @@ async def wish(cb: CallbackQuery, state: FSMContext) -> None:
 
 
 async def check_and_confirm(message: Message, state: FSMContext, uname: str) -> None:
-    wait = await message.answer(t("un_checking", name=h(uname)))
+    wait = await say(message, t("un_checking", name=h(uname)))
     status = await username_check.check(uname)
     await state.set_state(UnSt.confirm)
     await state.update_data(username=uname, check=status)
@@ -128,7 +128,7 @@ async def check_and_confirm(message: Message, state: FSMContext, uname: str) -> 
 async def wish_input(message: Message, state: FSMContext) -> None:
     uname = clean_username(message.text)
     if not uname:
-        await message.answer(t("un_wish_bad"))
+        await say(message, t("un_wish_bad"))
         return
     await check_and_confirm(message, state, uname)
 
@@ -146,5 +146,5 @@ async def wish_ok(cb: CallbackQuery, state: FSMContext, session: AsyncSession, u
         [["Юзернейм", f"@{uname}"], ["Проверка", data.get("check", "")]],
         None, {"username": uname, "stages": {}},
     )
-    await show(cb, created_text(order), client_order_kb(order))
+    await show(cb, created_text(order), client_order_kb(order), keep=True)
 

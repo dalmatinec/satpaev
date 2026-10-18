@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...cb import Adm
 from ...services import settings, subscription
-from ...ui import answer, btn, kb, show
+from ...ui import answer, btn, kb, say, show
 from ...utils import h
 from .common import Ctx, ask, op, screen
 
@@ -89,13 +89,13 @@ async def op_sub_add(ctx: Ctx) -> None:
         if m:
             chat, url = "@" + m.group(1), f"https://t.me/{m.group(1)}"
     if not chat:
-        await ctx.target.answer("Не понял. Пример: <code>@newssatbox</code>")
+        await say(ctx.target, "Не понял. Пример: <code>@newssatbox</code>")
         return
     try:
         info = await ctx.bot.get_chat(chat)
         title = info.title or chat
     except (TelegramBadRequest, TelegramForbiddenError):
-        await ctx.target.answer("Бот не видит этот канал. Добавьте бота в канал админом и пришлите ещё раз.")
+        await say(ctx.target, "Бот не видит этот канал. Добавьте бота в канал админом и пришлите ещё раз.")
         return
     chans = [c for c in subscription.channels() if c["chat"] != chat]
     chans.append({"chat": chat, "url": url, "title": title})

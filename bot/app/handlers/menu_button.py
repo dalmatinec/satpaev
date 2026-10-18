@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.models import User
 from ..services import settings
-from ..ui import _text_kwargs
+from ..ui import _text_kwargs, remember_temp
 
 router = Router(name="menu_button")
 
@@ -48,13 +48,15 @@ async def ensure(message: Message, session: AsyncSession, user: User | None) -> 
     try:
         if want:
             try:
-                await message.answer(**_text_kwargs(settings.t("menu_kb_hint")), reply_markup=_markup())
+                sent = await message.answer(**_text_kwargs(settings.t("menu_kb_hint")), reply_markup=_markup())
             except TelegramBadRequest:
-                await message.answer(**_text_kwargs(settings.t("menu_kb_hint")), reply_markup=_markup(icon=False))
+                sent = await message.answer(**_text_kwargs(settings.t("menu_kb_hint")), reply_markup=_markup(icon=False))
         else:
-            await message.answer("⌨️", reply_markup=ReplyKeyboardRemove())
+            sent = await message.answer("⌨️", reply_markup=ReplyKeyboardRemove())
     except TelegramBadRequest:
         return
+    # подсказка нужна один раз: уберётся вместе со следующим экраном, а кнопка внизу останется
+    remember_temp(sent.chat.id, sent.message_id)
     user.menu_kb = want
     await session.commit()
 

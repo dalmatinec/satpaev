@@ -1,6 +1,7 @@
 from contextlib import suppress
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -10,7 +11,7 @@ from ..cb import Nav
 from ..db.models import User
 from ..services import media, settings, webapp
 from ..texts import MENU_KEYS, strip_html
-from ..ui import answer, mbtn, screen_kb, send_safe, show
+from ..ui import _with_edit_row, answer, mbtn, plain_kb, screen_kb, send_safe, show
 from ..utils import clean_username, h
 
 router = Router(name="start")
@@ -38,10 +39,33 @@ def main_kb(is_admin: bool = False):
     return screen_kb("menu", menu_buttons())
 
 
-async def more_view(target) -> None:
+def more_kb():
     buttons = menu_buttons()
-    buttons["home"] = mbtn("home", Nav(to="menu"))
-    await show(target, settings.t("more_screen"), screen_kb("more", buttons), edit=("more_screen", "more"))
+    buttons["back"] = mbtn("back", Nav(to="menu", p=1))  # p=1: вернуться, поменяв только кнопки
+    return screen_kb("more", buttons)
+
+
+async def _swap_keyboard(cb: CallbackQuery, markup, edit) -> bool:
+    """Подменю: меняем только кнопки под тем же сообщением (картинка и текст остаются)."""
+    if not isinstance(cb.message, Message):
+        return False
+    markup = _with_edit_row(cb, markup, edit)
+    for attempt in (markup, plain_kb(markup)):
+        try:
+            await cb.message.edit_reply_markup(reply_markup=attempt)
+            await answer(cb)
+            return True
+        except TelegramBadRequest as e:
+            if "not modified" in str(e):
+                await answer(cb)
+                return True
+    return False
+
+
+async def more_view(target) -> None:
+    if isinstance(target, CallbackQuery) and await _swap_keyboard(target, more_kb(), (None, "more")):
+        return
+    await show(target, settings.t("more_screen"), more_kb(), edit=("more_screen", "more"))
 
 
 async def show_menu(target, user: User | None, is_admin: bool) -> None:
@@ -135,9 +159,12 @@ async def cmd_start(
 
 
 @router.callback_query(Nav.filter(F.to == "menu"))
-async def nav_menu(cb: CallbackQuery, user: User, is_admin: bool, session: AsyncSession) -> None:
+async def nav_menu(cb: CallbackQuery, callback_data: Nav, user: User, is_admin: bool, session: AsyncSession) -> None:
     from . import menu_button
 
+    if callback_data.p == 1 and menu_button.wanted() == (user.menu_kb or "") \
+            and await _swap_keyboard(cb, main_kb(is_admin), ("welcome", "menu")):
+        return  # назад из «Ещё»: только кнопки обратно
     if menu_button.wanted() != (user.menu_kb or "") and cb.message:
         # кнопки ещё нет: ставим и показываем меню новым сообщением под подсказкой
         await answer(cb)

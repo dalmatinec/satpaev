@@ -4,7 +4,7 @@ from typing import Any, Awaitable, Callable
 
 from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, TelegramObject, User as TgUser
+from aiogram.types import CallbackQuery, Message, TelegramObject, User as TgUser
 
 from .config import config
 from .db import SessionMaker
@@ -90,3 +90,41 @@ class ResetStateMiddleware(BaseMiddleware):
             if await state.get_state() is not None:
                 await state.clear()
         return await handler(event, data)
+
+
+# состояния, в которых сообщение клиента или админа нужно только боту: после обработки его можно убрать
+_CLEAN_STATES = ("StarsSt:", "PremSt:", "ExSt:", "UnSt:", "DevSt:", "BuySt:", "ReviewSt:", "AdmSt:input", "AdmSt:wizard")
+_CLEAN_COMMANDS = ("/start", "/menu", "/admin", "/edit")
+
+
+class CleanInputMiddleware(BaseMiddleware):
+    """Чистый чат: команды, кнопка «Главное меню» и ответы на вопросы бота удаляются после обработки.
+
+    Переписка с менеджером, посты и рассылки не трогаются: там сообщение клиента или админа важно.
+    """
+
+    async def __call__(self, handler, event: Message, data: dict[str, Any]) -> Any:
+        if event.chat.type != "private":
+            return await handler(event, data)
+        clean = False
+        text = (event.text or "").strip()
+        if text.startswith(_CLEAN_COMMANDS):
+            clean = True
+        else:
+            state = data.get("state")
+            current = await state.get_state() if state is not None else None
+            if current and current.startswith(_CLEAN_STATES):
+                clean = True
+            elif text:
+                from .handlers import menu_button
+
+                user = data.get("user")
+                clean = text == menu_button.label() or bool(user and user.menu_kb and text == user.menu_kb)
+        result = await handler(event, data)
+        bot = data.get("bot")
+        if clean and bot is not None:
+            try:
+                await bot.delete_message(event.chat.id, event.message_id)
+            except Exception:
+                pass
+        return result

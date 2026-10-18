@@ -82,21 +82,81 @@ def _with_edit_row(target, kb: InlineKeyboardMarkup | None, edit: tuple[str | No
     return InlineKeyboardMarkup(inline_keyboard=rows + [row])
 
 
+# ---------- чистый чат ----------
+# В личке держим один «экран» бота: новый экран убирает прошлый и временные сообщения
+# (подсказки об ошибках ввода). Экраны с keep=True (заказ оформлен, реквизиты) не удаляются.
+# Уведомления (send_safe) сюда не попадают и остаются в чате.
+_screens: dict[int, int] = {}
+_temps: dict[int, list[int]] = {}
+_keep: set[tuple[int, int]] = set()
+
+
+def _chat_of(target) -> int | None:
+    if isinstance(target, CallbackQuery):
+        return target.message.chat.id if target.message else target.from_user.id
+    chat = getattr(target, "chat", None)
+    return chat.id if chat and chat.type == "private" else None
+
+
+def remember_temp(chat_id: int, message_id: int) -> None:
+    lst = _temps.setdefault(chat_id, [])
+    lst.append(message_id)
+    del lst[:-20]
+
+
+async def _cleanup(bot: Bot, chat_id: int, new_id: int | None, keep: bool) -> None:
+    ids = _temps.pop(chat_id, [])
+    prev = _screens.get(chat_id)
+    if new_id is not None:
+        if prev and prev != new_id and (chat_id, prev) not in _keep:
+            ids.append(prev)
+        _screens[chat_id] = new_id
+        if keep:
+            if len(_keep) > 20000:
+                _keep.clear()
+            _keep.add((chat_id, new_id))
+    if len(_screens) > 50000:
+        _screens.clear()
+    ids = [i for i in ids if i != new_id]
+    if not ids:
+        return
+    with suppress(Exception):
+        if len(ids) == 1:
+            await bot.delete_message(chat_id, ids[0])
+        else:
+            await bot.delete_messages(chat_id, ids)
+
+
+async def say(target, *args, **kwargs):
+    """Короткий ответ (ошибка ввода, подсказка): удалится при следующем экране."""
+    if isinstance(target, CallbackQuery):
+        return await target.answer(*args, **kwargs)
+    msg = await target.answer(*args, **kwargs)
+    if msg and msg.chat.type == "private":
+        remember_temp(msg.chat.id, msg.message_id)
+    return msg
+
+
 async def show(
     target: Message | CallbackQuery,
     content: Content,
     kb: InlineKeyboardMarkup | None = None,
     photo: str | None = None,
     edit: tuple[str | None, str | None] | None = None,
+    keep: bool = False,
 ) -> Message | None:
     kb = _with_edit_row(target, kb, edit)
     try:
-        return await _show(target, content, kb, photo)
+        msg = await _show(target, content, kb, photo)
     except TelegramBadRequest as e:
-        if _has_extras(kb):
-            log.info("клавиатура с иконками не принята (%s), показываю без них", e)
-            return await _show(target, content, plain_kb(kb), photo)
-        raise
+        if not _has_extras(kb):
+            raise
+        log.info("клавиатура с иконками не принята (%s), показываю без них", e)
+        msg = await _show(target, content, plain_kb(kb), photo)
+    chat_id = _chat_of(target)
+    if chat_id is not None and isinstance(msg, Message):
+        await _cleanup(target.bot, chat_id, msg.message_id, keep)
+    return msg
 
 
 async def _show(target, content: Content, kb, photo: str | None) -> Message | None:

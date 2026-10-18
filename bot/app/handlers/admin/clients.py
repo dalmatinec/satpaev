@@ -10,7 +10,7 @@ from ...cb import Adm
 from ...db.models import Order, RefAccrual, SupportLink, User
 from ...services.orders import TAGS, kind_plain, status_icon, tag_name
 from ...states import AdmSt
-from ...ui import btn, kb, pager, show
+from ...ui import btn, kb, pager, say, show
 from ...utils import clean_username, fdate, h, money
 from ..support import deliver_to_user
 from .common import Ctx, ask, op, screen
@@ -165,7 +165,7 @@ async def op_find(ctx: Ctx) -> None:
                 select(User).where(or_(User.full_name.ilike(f"%{raw[:50]}%"))).order_by(User.last_seen.desc()).limit(1)
             )
     if not user:
-        await ctx.target.answer("Не нашёл. Введите id, @username или имя:")
+        await say(ctx.target, "Не нашёл. Введите id, @username или имя:")
         return
     await ctx.state.clear()
     await card(ctx.target, ctx.session, user.id)
@@ -188,7 +188,7 @@ async def reply_message(message: Message, state: FSMContext, session: AsyncSessi
     uid = int(data.get("user_id") or 0)
     ok, err = await deliver_to_user(message.bot, message, uid)
     markup = kb([btn("💬 Ещё сообщение", Adm(s="cl", a="write", i=uid)), btn("👤 Клиент", Adm(s="cl", a="card", i=uid))])
-    await message.answer("✅ Доставлено" if ok else f"⚠️ Не доставлено: {h(err)}", reply_markup=markup)
+    await say(message, "✅ Доставлено" if ok else f"⚠️ Не доставлено: {h(err)}", reply_markup=markup)
 
 
 class SupportReply(Filter):

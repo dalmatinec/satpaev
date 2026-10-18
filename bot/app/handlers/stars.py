@@ -11,7 +11,7 @@ from ..db.models import User
 from ..services import media, settings
 from ..services.orders import client_order_kb, create_order, created_text
 from ..states import StarsSt
-from ..ui import back_menu, kb, mbtn, screen_kb, show
+from ..ui import back_menu, kb, mbtn, say, screen_kb, show
 from ..utils import clean_username, h, money, num, round_up
 
 router = Router(name="stars")
@@ -88,7 +88,7 @@ async def custom_qty(cb: CallbackQuery, state: FSMContext) -> None:
 async def input_qty(message: Message, state: FSMContext, user: User) -> None:
     raw = (message.text or "").replace(" ", "")
     if not raw.isdigit() or int(raw) < min_qty() or int(raw) > 1_000_000:
-        await message.answer(t("stars_bad_qty", min=num(min_qty())))
+        await say(message, t("stars_bad_qty", min=num(min_qty())))
         return
     await ask_recipient(message, state, user, int(raw))
 
@@ -117,7 +117,7 @@ async def recipient_me(cb: CallbackQuery, state: FSMContext, user: User) -> None
 async def input_recipient(message: Message, state: FSMContext) -> None:
     uname = clean_username(message.text)
     if not uname:
-        await message.answer(t("stars_bad_recipient"))
+        await say(message, t("stars_bad_recipient"))
         return
     await confirm(message, state, uname)
 
@@ -137,5 +137,5 @@ async def place(cb: CallbackQuery, state: FSMContext, session: AsyncSession, use
         [["Количество", f"{num(qty)} ⭐"], ["Получатель", f"@{recipient}"], ["Цена за звезду", f"{num(unit)} ₸"]],
         total, {"qty": qty, "recipient": recipient},
     )
-    await show(cb, created_text(order), client_order_kb(order))
+    await show(cb, created_text(order), client_order_kb(order), keep=True)
 

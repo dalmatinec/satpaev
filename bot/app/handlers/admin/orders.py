@@ -11,7 +11,7 @@ from ...db.models import Order, User
 from ...services import orders as svc
 from ...texts import strip_html
 from ...services import settings
-from ...ui import btn, kb, mbtn, pager, send_safe, show
+from ...ui import btn, kb, mbtn, pager, say, send_safe, show
 from ...utils import h, money, parse_number
 from .common import Ctx, ask, op, screen
 
@@ -140,7 +140,7 @@ async def op_cost(ctx: Ctx) -> None:
     if ctx.text is not None:
         cost = Decimal(0) if ctx.text.strip() == "0" else parse_number(ctx.text)
         if cost is None:
-            await ctx.target.answer("Нужно число, например <code>28000</code>. Или нажмите «Пропустить».")
+            await say(ctx.target, "Нужно число, например <code>28000</code>. Или нажмите «Пропустить».")
             return
     await ctx.state.clear()
     if order and order.status not in ("done", "canceled"):
@@ -152,7 +152,7 @@ async def op_cost(ctx: Ctx) -> None:
 async def op_price(ctx: Ctx) -> None:
     price = parse_number(ctx.text)
     if price is None:
-        await ctx.target.answer("Нужно число, например <code>30500</code>:")
+        await say(ctx.target, "Нужно число, например <code>30500</code>:")
         return
     await ctx.state.clear()
     order = await ctx.session.get(Order, int(ctx.data["order_id"]))

@@ -13,7 +13,7 @@ from ...cb import Adm
 from ...db.models import Order, RefAccrual, Review, User
 from ...services import backup, posting, settings, webapp
 from ...services.reviews import first_name, name_html, review_post, reviews_target
-from ...ui import answer, btn, kb, send_safe, show
+from ...ui import answer, btn, kb, say, send_safe, show
 from ...utils import fdate, h, money, num, parse_number
 from .common import Ctx, ask, op, screen
 
@@ -87,7 +87,7 @@ async def on_ref(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, s
 async def op_ref_pct(ctx: Ctx) -> None:
     value = parse_number(ctx.text)
     if value is None or value > 100:
-        await ctx.target.answer("Число от 0 до 100:")
+        await say(ctx.target, "Число от 0 до 100:")
         return
     await ctx.state.clear()
     await settings.put(ctx.session, "ref_percent", float(value))
@@ -341,7 +341,7 @@ async def _back(ctx: Ctx) -> None:
 @op("set_text")
 async def op_set_text(ctx: Ctx) -> None:
     if not ctx.text:
-        await ctx.target.answer("Пришлите текст:")
+        await say(ctx.target, "Пришлите текст:")
         return
     await settings.put(ctx.session, ctx.data["key"], ctx.text.strip()[:64])
     await _back(ctx)
@@ -351,7 +351,7 @@ async def op_set_text(ctx: Ctx) -> None:
 async def op_set_time(ctx: Ctx) -> None:
     m = re.fullmatch(r"\s*(\d{1,2})[:.](\d{2})\s*", ctx.text or "")
     if not m or int(m.group(1)) > 23 or int(m.group(2)) > 59:
-        await ctx.target.answer("Формат времени <code>10:00</code>:")
+        await say(ctx.target, "Формат времени <code>10:00</code>:")
         return
     await settings.put(ctx.session, ctx.data["key"], f"{int(m.group(1)):02d}:{m.group(2)}")
     await _back(ctx)
@@ -362,7 +362,7 @@ async def op_set_num(ctx: Ctx) -> None:
     value = parse_number(ctx.text)
     limit = 10 ** 9 if ctx.data["key"] in ("min_order", "ex_fee") else 1000
     if value is None or value > limit:
-        await ctx.target.answer("Нужно число:")
+        await say(ctx.target, "Нужно число:")
         return
     await settings.put(ctx.session, ctx.data["key"], float(value))
     await _back(ctx)
@@ -380,7 +380,7 @@ async def op_set_url(ctx: Ctx) -> None:
     if value.startswith("t.me/"):
         value = "https://" + value
     if not value.startswith(("http://", "https://")):
-        await ctx.target.answer("Ссылка должна начинаться с https:// или t.me/")
+        await say(ctx.target, "Ссылка должна начинаться с https:// или t.me/")
         return
     await settings.put(ctx.session, ctx.data["key"], value[:256])
     if ctx.data["key"] == "site_url":

@@ -14,7 +14,7 @@ from ...cb import Adm, AIn
 from ...db.models import Item
 from ...services import settings
 from ...states import AdmSt
-from ...ui import btn, kb, pager, show
+from ...ui import btn, kb, pager, say, show
 from ...utils import clean_username, h, money, num, parse_number
 from ..usernames import ready_price
 from .common import Ctx, ask, op, screen
@@ -194,7 +194,7 @@ async def wizard_input(message: Message, state: FSMContext, session: AsyncSessio
     _, _, ftype, _ = FIELDS[data["kind"]][data["step"]]
     ok, value, error = _validate(ftype, message, message.text or message.caption)
     if not ok:
-        await message.answer(error)
+        await say(message, error)
         return
     await _wizard_next(message, state, session, value)
 
@@ -283,7 +283,7 @@ async def op_item_field(ctx: Ctx) -> None:
     else:
         ok, value, error = _validate(spec[2], ctx.message, ctx.text)
         if not ok:
-            await ctx.target.answer(error)
+            await say(ctx.target, error)
             return
     setattr(it, field, value)
     await ctx.session.commit()

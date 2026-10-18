@@ -408,7 +408,7 @@ MENU_KEYS = [k for k, (g, _) in BUTTONS.items() if g == "menu"]
 BUTTON_STYLES = {"app": "primary"}
 DEFAULT_LAYOUT = [["ex", "un"], ["premium", "stars"], ["gifts"], ["dev"], ["more"]]
 # что лежит во вкладке «🧩 Ещё» главного меню
-MORE_LAYOUT = [["orders", "reviews"], ["ref", "support"], ["site"], ["home"]]
+MORE_LAYOUT = [["orders", "reviews"], ["ref", "support"], ["site"], ["back"]]
 
 # Экраны, где кнопки можно двигать. Ключ экрана: (название, раскладка по умолчанию, куда вернуться)
 # Динамические кнопки (товары, листалка) стоят над этими кнопками и не двигаются.

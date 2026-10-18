@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...cb import Adm, Nav
 from ...services import media, settings
 from ...texts import BUTTON_GROUPS, BUTTON_STYLES, BUTTONS, GROUP_NAV, GROUPS, IMAGES, MENU_KEYS, SCREEN_KEYS, SCREENS, TEXTS, strip_html
-from ...ui import answer, btn, kb, pager, show
+from ...ui import answer, btn, kb, pager, say, show
 from ...utils import h
 from .common import Ctx, ask, op, screen
 
@@ -101,20 +101,20 @@ async def on_tx(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, st
 async def op_tx_edit(ctx: Ctx) -> None:
     key = ctx.data["key"]
     if ctx.message is None or not (ctx.message.text or ctx.message.caption):
-        await ctx.target.answer("Пришлите текст сообщением.")
+        await say(ctx.target, "Пришлите текст сообщением.")
         return
     html = ctx.message.html_text
     if TEXTS[key].plain:
         html = h(strip_html(html))[:200]
     if len(html) > 3800:
-        await ctx.target.answer("Слишком длинный текст, сократите до ~3500 символов.")
+        await say(ctx.target, "Слишком длинный текст, сократите до ~3500 символов.")
         return
     await settings.set_text(ctx.session, key, html)
     await ctx.session.commit()
     await ctx.state.clear()
     missing = [v for v in TEXTS[key].vars if "{" + v + "}" not in html and v not in ("brand", "name")]
     if missing:
-        await ctx.target.answer("⚠️ В тексте нет " + ", ".join("{" + v + "}" for v in missing) +
+        await say(ctx.target, "⚠️ В тексте нет " + ", ".join("{" + v + "}" for v in missing) +
                                 ": эти значения клиент не увидит. Если так задумано, всё в порядке.")
     if ctx.data.get("live"):
         nav = GROUP_NAV.get(TEXTS[key].group, "menu")
@@ -143,7 +143,7 @@ def _allowed(screen: str) -> list[str]:
     if screen == "menu":
         return list(MENU_KEYS)
     if screen == "more":
-        return [k for k in MENU_KEYS if k != "more"] + ["home"]
+        return [k for k in MENU_KEYS if k != "more"] + ["back"]
     return [k for row in SCREENS[screen][1] for k in row]
 
 
@@ -405,7 +405,7 @@ async def on_bt(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, st
 async def op_bt_text(ctx: Ctx) -> None:
     text = strip_html(ctx.text or "").strip()
     if not text:
-        await ctx.target.answer("Пришлите текст:")
+        await say(ctx.target, "Пришлите текст:")
         return
     await settings.set_button(ctx.session, ctx.data["key"], text=text[:60])
     await ctx.session.commit()
@@ -420,7 +420,7 @@ async def op_bt_icon(ctx: Ctx) -> None:
         ents = ctx.message.entities or ctx.message.caption_entities or []
         icon = next((e.custom_emoji_id for e in ents if e.type == "custom_emoji"), "") or ""
         if not icon:
-            await ctx.target.answer("Это не премиум эмодзи. Пришлите эмодзи из премиум набора:")
+            await say(ctx.target, "Это не премиум эмодзи. Пришлите эмодзи из премиум набора:")
             return
     await settings.set_button(ctx.session, ctx.data["key"], icon=icon)
     await ctx.session.commit()
@@ -445,13 +445,13 @@ async def op_bt_layout(ctx: Ctx) -> None:
         if row:
             rows.append(row)
     if not rows:
-        await ctx.target.answer("Не нашёл ни одного кода кнопки. Коды есть в списке выше.")
+        await say(ctx.target, "Не нашёл ни одного кода кнопки. Коды есть в списке выше.")
         return
     await settings.set_layout(ctx.session, screen, rows)
     await ctx.session.commit()
     await ctx.state.clear()
     if unknown:
-        await ctx.target.answer("Пропустил неизвестное: " + h(", ".join(unknown[:10])))
+        await say(ctx.target, "Пропустил неизвестное: " + h(", ".join(unknown[:10])))
     await screen_editor(ctx.target, screen)
 
 
@@ -521,7 +521,7 @@ async def on_img(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, s
 @op("img_set")
 async def op_img_set(ctx: Ctx) -> None:
     if ctx.message is None or not ctx.message.photo:
-        await ctx.target.answer("Пришлите именно фото (сжатой картинкой).")
+        await say(ctx.target, "Пришлите именно фото (сжатой картинкой).")
         return
     await media.save(ctx.session, ctx.bot, ctx.data["key"], ctx.message.photo[-1].file_id)
     await ctx.state.clear()

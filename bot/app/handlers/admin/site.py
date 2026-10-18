@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...cb import Adm
 from ...config import config
 from ...services import settings, webapp
-from ...ui import answer, btn, kb, show
+from ...ui import answer, btn, kb, say, show
 from ...utils import h
 from .common import Ctx, ask, op, screen
 
@@ -86,7 +86,7 @@ async def on_web(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, s
 async def op_web_menu(ctx: Ctx) -> None:
     value = (ctx.text or "").strip()
     if not value:
-        await ctx.target.answer("Пришлите текст кнопки:")
+        await say(ctx.target, "Пришлите текст кнопки:")
         return
     await settings.put(ctx.session, "webapp_menu_text", value[:32])
     await ctx.session.commit()

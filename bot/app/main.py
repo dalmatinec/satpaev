@@ -13,7 +13,7 @@ from .config import config
 from .db import init_db
 from .handlers import build_routers
 from .handlers.subscribe import SubscriptionMiddleware
-from .middlewares import AppMiddleware, ResetStateMiddleware
+from .middlewares import AppMiddleware, CleanInputMiddleware, ResetStateMiddleware
 from .services import media, scheduler, settings, username_check, webapp
 
 log = logging.getLogger("bot")
@@ -55,6 +55,7 @@ async def main() -> None:
     dp.update.outer_middleware(AppMiddleware(sm))
     dp.callback_query.outer_middleware(ResetStateMiddleware())
     dp.message.outer_middleware(SubscriptionMiddleware())
+    dp.message.outer_middleware(CleanInputMiddleware())
     dp.callback_query.outer_middleware(SubscriptionMiddleware())
     dp.message.filter(F.chat.type == ChatType.PRIVATE)
     dp.include_routers(*build_routers())

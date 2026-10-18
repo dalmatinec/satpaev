@@ -100,7 +100,7 @@ async def place_item(cb: CallbackQuery, state: FSMContext, session: AsyncSession
             [["Юзернейм", f"@{item.title}"], ["Цена", f"{price_ton} TON"]],
             price_kzt, {"username": item.title, "price_ton": price_ton}, item_id=item.id,
         )
-    await show(cb, created_text(order), client_order_kb(order))
+    await show(cb, created_text(order), client_order_kb(order), keep=True)
 
 
 @router.callback_query(BuySt.confirm, In.filter(F.a == "buy_ok"))
