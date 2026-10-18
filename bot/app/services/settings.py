@@ -24,6 +24,8 @@ DEFAULTS: dict = {
     "premium_plans": [[3, 17], [6, 32], [12, 60]],
     "premium_usd": 0,
     "ton_kzt": 0,
+    "rates_valid_hours": 3,  # «курс действует с 09:00 до 12:00»: сколько часов от момента публикации
+    "rates_history": [],  # последние публикации курсов (не больше 30)
     "ex_fee": 0,  # фиксированный сбор за каждую сделку обмена, ₸ (0 = без сбора)
     "ex_fee_name": "Сервисный сбор",
     "uname_markup": 2,
@@ -54,10 +56,13 @@ DEFAULTS: dict = {
 def _default_rich(key: str) -> Rich:
     if key == "rates_template":
         text, ents = Text(
-            Bold("💱 Курсы на {date}"), "\n\n", "{rates}", "\n\n",
-            "⭐ Звёзды от {stars_min}\n",
+            "📅 {date} · 🕘 {time}\n\n",
+            Bold("{greeting}"), "\n",
+            "💱 Курс на сегодня ", Bold("{valid}"), ":\n\n",
+            "{rates}", "\n\n",
+            "🧾 {fee}\n",
             "⚡ Обмен {sla_exchange}\n",
-            "🧾 {fee}\n\n",
+            "⭐ Звёзды от {stars_min}\n\n",
             "Заказать: {bot}",
         ).render()
         return Rich(text, ents or None)
@@ -110,6 +115,11 @@ def rich(key: str) -> Rich:
     if isinstance(stored, dict) and stored.get("text"):
         return Rich(stored["text"], entities_from_store(stored.get("entities")))
     return _default_rich(key)
+
+
+def default_rich_raw(key: str) -> tuple[str, list[dict]]:
+    r = _default_rich(key)
+    return r.text, [e.model_dump(exclude_none=True) for e in (r.entities or [])]
 
 
 def rich_raw(key: str) -> tuple[str, list[dict]]:

@@ -17,7 +17,8 @@ from .common import Ctx, ask, op, screen
 router = Router(name="admin_rates")
 
 PLACEHOLDERS = (
-    "{date} дата · {rates} список курсов · {stars_min} цена звезды от · {sla_exchange} срок обмена · "
+    "{date} дата · {time} время · {greeting} приветствие по времени суток · {valid} «с 09:00 до 12:00» · "
+    "{rates} список курсов · {stars_min} цена звезды от · {sla_exchange} срок обмена · "
     "{sla_stars} срок звёзд · {ton} курс TON · {fee} сбор за сделку · {bot} юзернейм бота · {brand} название"
 )
 
@@ -38,8 +39,10 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
     fee = settings.get("ex_fee") or 0
     b.row(btn(f"🧾 Сбор: {money(fee) if fee else 'нет'}", Adm(s="rates", a="fee")),
           btn("🏷 Название сбора", Adm(s="rates", a="fee_name")))
-    b.row(btn("📢 Отправить курсы", Adm(s="rates", a="post"), style="primary"),
-          btn("🧾 Шаблон поста", Adm(s="rates", a="tpl")))
+    b.row(btn("📢 Отправить курсы", Adm(s="rates", a="post"), style="primary"))
+    b.row(btn("🧾 Шаблон поста", Adm(s="rates", a="tpl")),
+          btn(f"⏳ Действует: {num(settings.get('rates_valid_hours') or 3)} ч", Adm(s="rates", a="valid")))
+    b.row(btn("📜 История курсов", Adm(s="rates", a="hist")))
     b.row(btn("⚙️ Админка", Adm(s="menu")))
     await show(
         target,
@@ -123,9 +126,31 @@ async def on_rates(cb: CallbackQuery, callback_data: Adm, session: AsyncSession,
         from .channel import start_text_post
 
         text, ents = await posting.rates_post(session, cb.bot)
+        active = (await session.execute(
+            select(Rate).where(Rate.is_active.is_(True)).order_by(Rate.sort, Rate.id))).scalars().all()
+        from datetime import datetime
+
+        from ...config import config
+
+        snapshot = {"at": datetime.now(config.tz).strftime("%d.%m.%Y %H:%M"),
+                    "rates": [[r.code, num(r.buy).replace(".", ",") if r.buy else "",
+                               num(r.sell).replace(".", ",") if r.sell else ""] for r in active],
+                    "fee": num(settings.get("ex_fee")) if settings.get("ex_fee") else ""}
         await start_text_post(cb, state, session, text, ents, Adm(s="rates"),
-                              "👀 <b>Пост с курсами на сегодня</b>\nДата и курсы подставились сами. "
-                              "Поменять оформление: 💱 Курсы → 🧾 Шаблон поста.")
+                              "👀 <b>Пост с курсами на сегодня</b>", history=snapshot)
+    elif a == "hist":
+        hist = settings.get("rates_history") or []
+        lines = []
+        for e in hist[:15]:
+            parts = [f"{c} {b or '-'}/{s_ or '-'}" for c, b, s_ in e.get("rates") or []]
+            fee = f" · сбор {e['fee']} ₸" if e.get("fee") else ""
+            lines.append(f"<b>{h(e.get('at', ''))}</b>\n{h(' · '.join(parts) or 'нет курсов')}{h(fee)}")
+        body = "\n\n".join(lines) or "Пока пусто: история появится после первой публикации курсов."
+        await show(cb, "📜 <b>История курсов</b>\nпокупаем / продаём, последние публикации\n\n" + body,
+                   kb([btn("◀️ Курсы", Adm(s="rates"))]))
+    elif a == "valid":
+        await ask(cb, state, "set_num", "⏳ Сколько часов действует курс после публикации? Например <code>3</code>: "
+                  "в посте будет «с 09:00 до 12:00».", Adm(s="rates"), key="rates_valid_hours")
     elif a == "post_ok":
         text, ents = await posting.rates_post(session, cb.bot)
         ok, info = await posting.publish(session, cb.bot, text, ents, kind="rates")

@@ -154,7 +154,7 @@ async def on_channel(cb: CallbackQuery, callback_data: Adm, session: AsyncSessio
 
 # ---------------- новый пост ----------------
 
-async def _options(session: AsyncSession) -> list[dict]:
+async def _options(session: AsyncSession, bot=None) -> list[dict]:
     opts: list[dict] = []
     main = (config.channel_id or "").lstrip("@").lower()
     if config.poster_enabled:
@@ -164,10 +164,14 @@ async def _options(session: AsyncSession) -> list[dict]:
             opts.append({"type": "acc", "target": str(c.id), "title": f"👤 {c.title}", "on": bool(is_main)})
         if not chans and config.channel_id:
             opts.append({"type": "acc", "target": config.channel_id, "title": f"👤 {config.channel_id}", "on": True})
-        if config.channel_id:  # тот же канал, но от имени бота
-            opts.append({"type": "botch", "target": config.channel_id, "title": f"🤖 {config.channel_id} от бота", "on": False})
     elif config.channel_id:
-        opts.append({"type": "botch", "target": config.channel_id, "title": f"🤖 {config.channel_id} (от бота)", "on": True})
+        title = config.channel_id
+        if bot is not None:
+            try:
+                title = (await bot.get_chat(config.channel_id)).title or title
+            except Exception:
+                pass
+        opts.append({"type": "botch", "target": config.channel_id, "title": f"📢 {title}", "on": True})
     chats = await session.scalar(
         select(func.count(BotChat.id)).where(BotChat.active.is_(True), BotChat.type.in_(GROUP_TYPES))) or 0
     if chats:
@@ -186,8 +190,9 @@ async def _targets_screen(target, state: FSMContext) -> None:
     rows.append([btn(f"📢 Опубликовать ({chosen})", AIn(a="post_ok"))])
     rows.append([btn("◀️ Отмена", Adm.unpack(data["back"]) if data.get("back") else Adm(s="ch"))])
     note = "" if data.get("account_ok", True) else "\n\n⚠️ Такой тип сообщения аккаунт не публикует, он уйдёт только в чаты с ботом."
-    text = ("📍 <b>Куда отправить?</b>\nОтметьте нужное: 👤 от вашего аккаунта, 🤖 от бота, "
-            "💬 во все группы с ботом, 📨 личным сообщением всем клиентам." + note)
+    text = ("📍 <b>Куда отправить?</b> Пост выше: так его увидят.\n\n"
+            "👤 ваши каналы (публикует ваш аккаунт, премиум эмодзи сохраняются)\n"
+            "📢 канал от имени бота\n💬 все группы, куда добавлен бот\n📨 личным сообщением всем клиентам бота" + note)
     if not opts:
         text = "Некуда публиковать: укажите CHANNEL_ID в .env или добавьте бота в группу."
     await show(target, text, kb(*rows))
@@ -203,7 +208,7 @@ async def post_input(message: Message, state: FSMContext, session: AsyncSession)
     await state.set_data({
         "from_chat": message.chat.id, "msg_id": message.message_id, "text": text, "entities": ents,
         "file_id": file_id, "kind": kind, "name": name, "account_ok": account_ok,
-        "photo": file_id if kind == "photo" else None, "opts": await _options(session),
+        "photo": file_id if kind == "photo" else None, "opts": await _options(session, message.bot),
     })
     await message.answer("👀 <b>Так пост будет выглядеть:</b>")
     try:
@@ -266,6 +271,11 @@ async def post_ok(cb: CallbackQuery, state: FSMContext, session: AsyncSession, s
             report.append("📨 Рассылка клиентам запущена, отчёт придёт сообщением")
         else:
             report.append("⚠️ Уже идёт другая рассылка клиентам, дождитесь окончания")
+    if data.get("history"):
+        hist = list(settings.get("rates_history") or [])
+        hist.insert(0, data["history"])
+        await settings.put(session, "rates_history", hist[:30])
+        await session.commit()
     await show(cb, "📢 <b>Готово</b>\n\n" + h("\n".join(report)), kb(
         [btn("✍️ Ещё пост", Adm(s="ch", a="new")), btn("📄 Очередь", Adm(s="ch", a="queue"))],
         [btn("◀️ Посты", Adm(s="ch"))],
@@ -273,7 +283,7 @@ async def post_ok(cb: CallbackQuery, state: FSMContext, session: AsyncSession, s
 
 
 async def start_text_post(cb: CallbackQuery, state: FSMContext, session: AsyncSession, text: str,
-                          ents: list[dict] | None, back: Adm, title: str) -> None:
+                          ents: list[dict] | None, back: Adm, title: str, history: dict | None = None) -> None:
     """Готовый текст (например, курсы на сегодня): превью и выбор, куда отправить."""
     await show(cb, title)
     try:
@@ -286,6 +296,6 @@ async def start_text_post(cb: CallbackQuery, state: FSMContext, session: AsyncSe
     await state.set_data({
         "from_chat": msg.chat.id, "msg_id": msg.message_id, "text": text, "entities": ents or [],
         "file_id": None, "kind": "", "name": "", "account_ok": True, "photo": None,
-        "opts": await _options(session), "back": back.pack(),
+        "opts": await _options(session, cb.bot), "back": back.pack(), "history": history,
     })
     await _targets_screen(msg, state)

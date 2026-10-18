@@ -5,7 +5,7 @@ import logging
 import os
 import shutil
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
@@ -117,16 +117,31 @@ async def rates_post(session: AsyncSession, bot: Bot) -> tuple[str, list[dict]]:
     for r in rates:
         parts = []
         if r.buy:
-            parts.append(f"покупаем {num(r.buy)} ₸")
+            parts.append(f"покупаем {num(r.buy).replace('.', ',')} ₸")
         if r.sell:
-            parts.append(f"продаём {num(r.sell)} ₸")
-        lines.append(f"• {r.code}: " + " · ".join(parts))
+            parts.append(f"продаём {num(r.sell).replace('.', ',')} ₸")
+        lines.append(f"🔹 {r.code}: " + " · ".join(parts))
     tiers = settings.star_tiers()
     stars_min = f"{num(min(p for _, p in tiers))} ₸ за шт" if tiers else "по запросу"
     me = await bot.me()
     template, ents = settings.rich_raw("rates_template")
+    if template.strip().startswith("/"):  # в шаблон случайно попала команда (например /start): берём стандартный
+        template, ents = settings.default_rich_raw("rates_template")
+    now = datetime.now(config.tz)
+    try:
+        hours = max(0.5, float(settings.get("rates_valid_hours") or 3))
+    except (TypeError, ValueError):
+        hours = 3.0
+    start = now.replace(minute=0, second=0, microsecond=0)  # «с 09:00», даже если опубликовали в 09:46
+    until = start + timedelta(hours=hours)
+    h_ = now.hour
+    greeting = ("☀️ Всем доброе утро!" if 5 <= h_ < 12 else "🌤 Всем добрый день!" if 12 <= h_ < 17
+                else "🌆 Всем добрый вечер!" if 17 <= h_ < 23 else "🌙 Всем доброй ночи!")
     values = {
-        "date": datetime.now(config.tz).strftime("%d.%m.%Y"),
+        "date": now.strftime("%d.%m.%Y"),
+        "time": now.strftime("%H:%M"),
+        "valid": f"с {start.strftime('%H:%M')} до {until.strftime('%H:%M')}",
+        "greeting": greeting,
         "rates": "\n".join(lines) or "по запросу",
         "stars_min": stars_min,
         "sla_exchange": str(settings.get("sla_exchange")),

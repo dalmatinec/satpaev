@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Awaitable, Callable
 
 from aiogram import Bot, F, Router
-from aiogram.filters import Command, Filter
+from aiogram.filters import Command, Filter, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy import func, select
@@ -85,6 +85,21 @@ async def ask(
         rows.append([btn("➡️ Пропустить", AIn(a="skip"))])
     rows.append([btn("◀️ Отмена", back)])
     await show(target, prompt, kb(*rows))
+
+
+@router.message(StateFilter(AdmSt), F.text.startswith("/"))
+async def command_during_input(message: Message, state: FSMContext, session: AsyncSession, user, is_admin: bool) -> None:
+    """Команда посреди ввода (шаблон, пост, рассылка) отменяет ввод, а не сохраняется как текст."""
+    await state.clear()
+    cmd = (message.text or "").split()[0].split("@")[0].lower()
+    if cmd == "/admin":
+        await admin_menu(message, session)
+    elif cmd == "/edit":
+        await cmd_edit(message, session, state)
+    else:
+        from ..start import show_menu
+
+        await show_menu(message, user, is_admin)
 
 
 @router.message(AdmSt.input)
