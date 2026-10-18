@@ -217,7 +217,11 @@ TEXTS: dict[str, TextSpec] = {
     "review_only_done": T("reviews", "Заказ не выполнен", "Отзыв можно оставить после выполнения заказа."),
     "reviews_screen": T("reviews", "Экран отзывов", "⭐ <b>Отзывы клиентов</b>\n\n{stats}{list}", ("stats", "list")),
     "reviews_stats": T("reviews", "Средняя оценка", "Средняя оценка: <b>{avg}</b> из 5 · отзывов: <b>{count}</b>\n\n", ("avg", "count")),
+    "reviews_item": T("reviews", "Один отзыв в списке", "{stars} · {name} · <i>{date}</i>\n{text}\n", ("stars", "name", "date", "text")),
     "reviews_empty": T("reviews", "Отзывов нет", "Отзывов пока нет, ваш может стать первым!"),
+    "review_free_ask": T("reviews", "Оставить отзыв: оценка", "✍️ Как вам наш сервис? Выберите оценку:"),
+    "review_too_often": T("reviews", "Слишком часто", "Вы недавно оставляли отзыв, спасибо! Новый можно через {days} дн.", ("days",)),
+    "review_orders_only": T("reviews", "Только после заказа", "Отзыв можно оставить после выполненного заказа. Будем рады вашему заказу!"),
 
     # ---------- подписка ----------
     "sub_required": T("sub", "Обязательная подписка", (
@@ -309,6 +313,7 @@ BUTTONS: dict[str, tuple[str, str]] = {
     "ref_share": ("shop", "📤 Поделиться ссылкой"),
     "ref_payout": ("shop", "💬 Запросить выплату"),
     "reviews_channel": ("shop", "📢 Все отзывы в канале"),
+    "review_write": ("shop", "✍️ Оставить отзыв"),
 
     "sub_channel": ("common", "📢 Подписаться на канал"),
     "sub_check": ("common", "✅ Я подписался"),
@@ -346,7 +351,7 @@ SCREENS: dict[str, tuple[str, list[list[str]], str]] = {
     "ref": ("👥 Рефералы", [["ref_share"], ["ref_payout"], ["home"]], "ref"),
     "order": ("📦 Карточка заказа", [["paid"], ["agree", "decline"], ["write_manager"], ["my_orders", "home_short"]], "orders"),
     "support": ("💬 Связь", [["finish_chat"]], "support"),
-    "reviews": ("⭐ Отзывы", [["reviews_channel"], ["home"]], "reviews"),
+    "reviews": ("⭐ Отзывы", [["review_write"], ["reviews_channel"], ["home"]], "reviews"),
     "sub": ("📢 Подписка", [["sub_check"], ["sub_continue"]], "menu"),
 }
 SCREEN_KEYS = list(SCREENS)

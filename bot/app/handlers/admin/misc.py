@@ -12,9 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...cb import Adm
 from ...db.models import Order, RefAccrual, Review, User
 from ...services import backup, posting, settings
-from ...services.reviews import review_post, reviews_target
+from ...services.reviews import first_name, name_html, review_post, reviews_target
 from ...ui import answer, btn, kb, send_safe, show
-from ...utils import h, money, num, parse_number
+from ...utils import fdate, h, money, num, parse_number
 from .common import Ctx, ask, op, screen
 
 router = Router(name="admin_misc")
@@ -97,44 +97,132 @@ async def op_ref_pct(ctx: Ctx) -> None:
 
 # ---------------- Отзывы ----------------
 
+REV_TABS = {"new": "🆕 Новые", "published": "✅ Опубликованные", "hidden": "🙈 Скрытые"}
+REV_PER_PAGE = 5
+
+
 @screen("rev")
 async def rev_view(target, session: AsyncSession, cbd: Adm) -> None:
+    if cbd.a == "card":
+        await rev_card(target, session, cbd.i)
+        return
+    tab = cbd.v if cbd.v in REV_TABS else "new"
     counts = dict((await session.execute(select(Review.status, func.count(Review.id)).group_by(Review.status))).all())
-    r = await session.scalar(select(Review).where(Review.status == "new").order_by(Review.id).limit(1))
-    head = (f"📝 <b>Отзывы</b>\n\nНовых: <b>{counts.get('new', 0)}</b> · опубликовано: <b>{counts.get('published', 0)}</b> · "
-            f"скрыто: <b>{counts.get('hidden', 0)}</b>")
+    total = counts.get(tab, 0)
+    pages = max(1, (total + REV_PER_PAGE - 1) // REV_PER_PAGE)
+    page = max(0, min(cbd.p, pages - 1))
+    rows = (await session.execute(
+        select(Review, User).join(User, User.id == Review.user_id, isouter=True)
+        .where(Review.status == tab).order_by(Review.created_at.desc())
+        .offset(page * REV_PER_PAGE).limit(REV_PER_PAGE)
+    )).all()
+    lines = []
+    b = InlineKeyboardBuilder()
+    for r, u in rows:
+        lines.append(f"{'⭐' * r.rating} · {name_html(u)} · {fdate(r.created_at)}"
+                     + (f"\n«{h(r.text[:120])}»" if r.text else ""))
+        b.row(btn(f"{'⭐' * r.rating} #{r.id} {first_name(u)}", Adm(s="rev", a="card", i=r.id, v=tab, p=page)))
+    tabs = [btn(("• " if k == tab else "") + f"{name} ({counts.get(k, 0)})", Adm(s="rev", v=k)) for k, name in REV_TABS.items()]
+    b.row(*tabs[:2])
+    b.row(tabs[2])
+    if pages > 1:
+        nav = []
+        if page > 0:
+            nav.append(btn("◀️", Adm(s="rev", v=tab, p=page - 1)))
+        nav.append(btn(f"{page + 1}/{pages}", Adm(s="rev", v=tab, p=page)))
+        if page < pages - 1:
+            nav.append(btn("▶️", Adm(s="rev", v=tab, p=page + 1)))
+        b.row(*nav)
+    names = "ссылкой на профиль" if settings.get("reviews_names") == "link" else "скрыты (Ал***)"
+    who = "все клиенты" if settings.get("reviews_mode") == "all" else "только после заказа"
+    b.row(btn(f"👤 Имена: {names}", Adm(s="rev", a="names", v=tab)))
+    b.row(btn(f"✍️ Оставлять могут: {who}", Adm(s="rev", a="mode", v=tab)))
+    b.row(btn("🔗 Ссылка на канал отзывов", Adm(s="set", a="url", v="reviews_link")))
+    b.row(btn("⚙️ Админка", Adm(s="menu")))
+    text = f"📝 <b>Отзывы</b> · {REV_TABS[tab]}: <b>{total}</b>\n\n" + ("\n\n".join(lines) or "Здесь пусто.")
+    await show(target, text, b.as_markup())
+
+
+async def rev_card(target, session: AsyncSession, review_id: int, tab: str = "new", page: int = 0) -> None:
+    r = await session.get(Review, review_id)
     if not r:
-        await show(target, head + "\n\nНовых отзывов нет.", kb([btn("⚙️ Админка", Adm(s="menu"))]))
+        await rev_view(target, session, Adm(s="rev", v=tab))
         return
     u = await session.get(User, r.user_id)
-    text = (head + f"\n\n{'⭐' * r.rating} · заказ #{r.order_id}\n{h(u.full_name if u else '')} ({h(u.mention if u else '')})\n\n"
-            + (f"«{h(r.text)}»" if r.text else "<i>без текста</i>"))
-    await show(target, text, kb(
-        [btn("📢 Опубликовать в канал", Adm(s="rev", a="pub", i=r.id))],
-        [btn("✅ Одобрить без поста", Adm(s="rev", a="ok", i=r.id)), btn("🙈 Скрыть", Adm(s="rev", a="hide", i=r.id))],
-        [btn("⚙️ Админка", Adm(s="menu"))],
-    ))
+    status = {"new": "🆕 новый", "published": "✅ опубликован", "hidden": "🙈 скрыт"}.get(r.status, r.status)
+    order = f"заказ #{r.order_id}" if r.order_id else "без заказа"
+    text = (
+        f"📝 <b>Отзыв #{r.id}</b> · {status}\n"
+        f"{'⭐' * r.rating} · {order}\n"
+        f"👤 {name_html(u)} ({h(u.mention if u else '')}) · <code>{r.user_id}</code>\n"
+        f"📅 {fdate(r.created_at)}\n\n"
+        + (f"«{h(r.text)}»" if r.text else "<i>без текста</i>")
+    )
+    rows = []
+    if r.status != "published":
+        rows.append([btn("📢 Опубликовать в канал", Adm(s="rev", a="pub", i=r.id, v=tab, p=page))])
+        rows.append([btn("✅ Показать в боте без поста", Adm(s="rev", a="ok", i=r.id, v=tab, p=page))])
+    if r.status != "hidden":
+        rows.append([btn("🙈 Скрыть", Adm(s="rev", a="hide", i=r.id, v=tab, p=page))])
+    rows.append([btn("🗑 Удалить", Adm(s="rev", a="del", i=r.id, v=tab, p=page)),
+                 btn("👤 Клиент", Adm(s="cl", a="card", i=r.user_id))])
+    rows.append([btn("◀️ К списку", Adm(s="rev", v=tab, p=page))])
+    await show(target, text, kb(*rows))
 
 
 @router.callback_query(Adm.filter(F.s == "rev"))
 async def on_rev(cb: CallbackQuery, callback_data: Adm, session: AsyncSession) -> None:
+    a, tab, page = callback_data.a, callback_data.v, callback_data.p
+    if a in ("", "card") and not (a == "card" and callback_data.i):
+        await rev_view(cb, session, callback_data)
+        return
+    if a == "names":
+        await settings.put(session, "reviews_names", "mask" if settings.get("reviews_names") == "link" else "link")
+        await session.commit()
+        await rev_view(cb, session, Adm(s="rev", v=tab))
+        return
+    if a == "mode":
+        await settings.put(session, "reviews_mode", "orders" if settings.get("reviews_mode") == "all" else "all")
+        await session.commit()
+        await rev_view(cb, session, Adm(s="rev", v=tab))
+        return
     r = await session.get(Review, callback_data.i) if callback_data.i else None
-    if r and callback_data.a == "pub":
+    if not r:
+        await rev_view(cb, session, Adm(s="rev", v=tab))
+        return
+    if a == "card":
+        await rev_card(cb, session, r.id, tab, page)
+        return
+    if a == "pub":
         u = await session.get(User, r.user_id)
-        order = await session.get(Order, r.order_id)
+        order = await session.get(Order, r.order_id) if r.order_id else None
         text, ents = review_post(r, u, order)
         ok, info = await posting.publish(session, cb.bot, text, ents, kind="review", target=reviews_target())
         if ok:
             r.status = "published"
             await session.commit()
         await answer(cb, info[:190], alert=not ok)
-    elif r and callback_data.a == "ok":
+    elif a == "ok":
         r.status = "published"
         await session.commit()
-    elif r and callback_data.a == "hide":
+        await answer(cb, "Отзыв виден в боте")
+    elif a == "hide":
         r.status = "hidden"
         await session.commit()
-    await rev_view(cb, session, Adm(s="rev"))
+        await answer(cb, "Отзыв скрыт")
+    elif a == "del":
+        await show(cb, f"Удалить отзыв #{r.id} насовсем?", kb(
+            [btn("🗑 Да, удалить", Adm(s="rev", a="del_ok", i=r.id, v=tab, p=page))],
+            [btn("◀️ Нет", Adm(s="rev", a="card", i=r.id, v=tab, p=page))],
+        ))
+        return
+    elif a == "del_ok":
+        await session.delete(r)
+        await session.commit()
+        await answer(cb, "Удалено")
+        await rev_view(cb, session, Adm(s="rev", v=tab, p=page))
+        return
+    await rev_card(cb, session, r.id, tab, page)
 
 
 # ---------------- Бэкапы ----------------

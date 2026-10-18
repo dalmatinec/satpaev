@@ -12,6 +12,12 @@ log = logging.getLogger(__name__)
 SessionMaker = async_sessionmaker[AsyncSession]
 
 
+# Точечные изменения схемы, которые нельзя сделать добавлением колонки. Безопасно повторять.
+PG_MIGRATIONS = [
+    "ALTER TABLE reviews ALTER COLUMN order_id DROP NOT NULL",
+]
+
+
 def _sync_schema(conn) -> None:
     """Создаёт таблицы, а в существующие добавляет недостающие колонки и индексы.
 
@@ -37,6 +43,9 @@ def _sync_schema(conn) -> None:
             if index.name not in index_names:
                 index.create(conn, checkfirst=True)
                 log.info("Добавлен индекс %s", index.name)
+    if dialect.name == "postgresql":
+        for statement in PG_MIGRATIONS:
+            conn.exec_driver_sql(statement)
 
 
 async def init_db() -> tuple[AsyncEngine, SessionMaker]:

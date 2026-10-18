@@ -193,7 +193,7 @@ class Review(Base):
     __tablename__ = "reviews"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    order_id: Mapped[int] = mapped_column(Integer)
+    order_id: Mapped[int | None] = mapped_column(Integer)  # пусто = отзыв без заказа
     user_id: Mapped[int] = mapped_column(BigInteger)
     rating: Mapped[int] = mapped_column(SmallInteger)
     text: Mapped[str] = mapped_column(Text, default="", server_default=EMPTY)
@@ -203,6 +203,7 @@ class Review(Base):
     __table_args__ = (
         Index("ux_reviews_order", "order_id", unique=True),
         Index("ix_reviews_status", "status", "created_at"),
+        Index("ix_reviews_user", "user_id", "created_at"),
     )
 
 
