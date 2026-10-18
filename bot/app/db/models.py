@@ -218,6 +218,7 @@ class Post(Base):
     text: Mapped[str] = mapped_column(Text, default="", server_default=EMPTY)
     entities: Mapped[list | None] = mapped_column(JSON)
     media: Mapped[str] = mapped_column(String(256), default="", server_default=EMPTY)
+    media_kind: Mapped[str] = mapped_column(String(16), default="", server_default=EMPTY)
     status: Mapped[str] = mapped_column(String(12), default="pending", server_default=sql("'pending'"))
     attempts: Mapped[int] = mapped_column(Integer, default=0, server_default=ZERO)
     error: Mapped[str] = mapped_column(Text, default="", server_default=EMPTY)
@@ -246,3 +247,29 @@ class Media(Base):
     file_id: Mapped[str] = mapped_column(String(256), default="", server_default=EMPTY)
     data: Mapped[bytes | None] = mapped_column(LargeBinary)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class BotChat(Base):
+    """Группы и каналы, куда добавлен бот (для рассылки постов)."""
+
+    __tablename__ = "bot_chats"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    type: Mapped[str] = mapped_column(String(16), default="", server_default=EMPTY)
+    title: Mapped[str] = mapped_column(String(256), default="", server_default=EMPTY)
+    username: Mapped[str] = mapped_column(String(64), default="", server_default=EMPTY)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sql("true"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    __table_args__ = (Index("ix_bot_chats_active", "active", "type"),)
+
+
+class PosterChannel(Base):
+    """Каналы, где ваш аккаунт может публиковать (список обновляет постер)."""
+
+    __tablename__ = "poster_channels"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    title: Mapped[str] = mapped_column(String(256), default="", server_default=EMPTY)
+    username: Mapped[str] = mapped_column(String(64), default="", server_default=EMPTY)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

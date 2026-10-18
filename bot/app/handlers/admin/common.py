@@ -131,7 +131,7 @@ async def admin_menu(target, session: AsyncSession, cbd: Adm | None = None) -> N
         [btn("💱 Курсы", Adm(s="rates")), btn("⭐ Звёзды", Adm(s="stars"))],
         [btn("🎁 Подарки", Adm(s="cat", v="gift")), btn("💎 Юзеры", Adm(s="cat", v="uname"))],
         [btn("🛠 Услуги", Adm(s="cat", v="service")), btn("🖼 Портфолио", Adm(s="cat", v="portfolio"))],
-        [btn("📢 Канал", Adm(s="ch")), btn("📨 Рассылка", Adm(s="bc"))],
+        [btn("📢 Посты", Adm(s="ch")), btn("📨 Рассылка", Adm(s="bc"))],
         [btn("👤 Клиенты", Adm(s="cl")), btn("📊 Статистика", Adm(s="stat"))],
         [btn(f"📝 Отзывы ({new_reviews})", Adm(s="rev")), btn("🧩 Ещё", Adm(s="more"))],
         [btn("🏠 Клиентское меню", Nav(to="menu"))],
@@ -170,7 +170,8 @@ async def more_menu(target, session: AsyncSession, cbd: Adm | None = None) -> No
         [btn(("🟢" if settings.is_editing(target.from_user.id if isinstance(target, CallbackQuery) else target.chat.id) else "⚪")
              + " Режим редактирования", Adm(s="bt", a="mode"))],
         [btn("✏️ Тексты", Adm(s="tx")), btn("🔘 Кнопки и экраны", Adm(s="bt"))],
-        [btn("🖼 Картинки", Adm(s="img")), btn("⚙️ Настройки", Adm(s="set"))],
+        [btn("🖼 Картинки", Adm(s="img")), btn("📢 Подписка на канал", Adm(s="sub"))],
+        [btn("⚙️ Настройки", Adm(s="set"))],
         [btn("👥 Рефералы", Adm(s="ref")), btn("💾 Бэкапы", Adm(s="bk"))],
         [btn("◀️ Админка", Adm(s="menu"))],
     ))

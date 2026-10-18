@@ -38,3 +38,9 @@ class AIn(CallbackData, prefix="ai"):
 
     a: str
     v: str = ""
+
+
+class Sub(CallbackData, prefix="sb"):
+    """Кнопки экрана подписки (не блокируются проверкой подписки)."""
+
+    a: str

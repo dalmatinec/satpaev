@@ -61,6 +61,15 @@ async def deep_link(payload: str, message: Message, state: FSMContext, session: 
     return False
 
 
+async def apply_referral(session: AsyncSession, bot, user: User, args: str) -> None:
+    if args.startswith("r") and args[1:].isdigit():
+        ref_id = int(args[1:])
+        if ref_id != user.id and not user.referrer_id and await session.get(User, ref_id):
+            user.referrer_id = ref_id
+            await session.commit()
+            await send_safe(bot, ref_id, settings.t("ref_new"))
+
+
 @router.message(CommandStart())
 async def cmd_start(
     message: Message,
@@ -71,15 +80,18 @@ async def cmd_start(
     is_admin: bool,
     state: FSMContext,
 ) -> None:
+    from ..services import subscription
+    from .subscribe import sub_view
+
     await state.clear()
     args = (command.args or "").strip()
-    if is_new_user and args.startswith("r") and args[1:].isdigit():
-        ref_id = int(args[1:])
-        if ref_id != user.id and await session.get(User, ref_id):
-            user.referrer_id = ref_id
-            await session.commit()
-            await send_safe(message.bot, ref_id, settings.t("ref_new"))
+    if is_new_user:
+        await apply_referral(session, message.bot, user, args)
     if args and await deep_link(args, message, state, session, user):
+        return
+    if (not is_admin and subscription.mode() == "recommend" and subscription.should_recommend(user.id)
+            and not await subscription.is_subscribed(message.bot, user.id)):
+        await sub_view(message, required=False)
         return
     await show_menu(message, user, is_admin)
 

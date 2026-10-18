@@ -126,6 +126,8 @@ class Poster:
                 # таблицы создаёт бот, ждём их
                 await self.pool.fetchval("SELECT 1 FROM posts LIMIT 1")
                 await self.pool.fetchval("SELECT 1 FROM poster_status LIMIT 1")
+                await self.pool.fetchval("SELECT media_kind FROM posts LIMIT 1")
+                await self.pool.fetchval("SELECT 1 FROM poster_channels LIMIT 1")
                 return
             except Exception as e:
                 log.info("Жду базу и таблицы бота: %s", e.__class__.__name__)
@@ -151,7 +153,7 @@ class Poster:
         return await self.pool.fetchrow(
             "UPDATE posts SET status = 'sending', attempts = attempts + 1 WHERE id = ("
             "  SELECT id FROM posts WHERE status = 'pending' AND mode = 'account' ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED"
-            ") RETURNING id, target, text, entities, media, attempts"
+            ") RETURNING id, target, text, entities, media, media_kind, attempts"
         )
 
     async def resolve(self, target: str):
@@ -172,8 +174,11 @@ class Poster:
         entity = await self.resolve(row["target"])
         ents = convert_entities(row["entities"])
         if row["media"] and os.path.exists(row["media"]):
-            msg = await self.client.send_file(entity, row["media"], caption=row["text"] or None,
-                                              formatting_entities=ents or None)
+            kind = row["media_kind"] or ""
+            msg = await self.client.send_file(
+                entity, row["media"], caption=row["text"] or None, formatting_entities=ents or None,
+                force_document=(kind == "document"), supports_streaming=(kind == "video"),
+            )
         else:
             msg = await self.client.send_message(entity, row["text"], formatting_entities=ents or None,
                                                  link_preview=False)
@@ -187,6 +192,27 @@ class Poster:
         status = "pending" if retry and row["attempts"] < MAX_ATTEMPTS else "failed"
         await self.pool.execute("UPDATE posts SET status = $2, error = $3 WHERE id = $1", row["id"], status, error[:500])
 
+    async def refresh_channels(self) -> None:
+        """Сохраняет каналы, где аккаунт может публиковать (создатель или админ с правом постинга)."""
+        found = []
+        async for d in self.client.iter_dialogs(limit=500):
+            ent = d.entity
+            if not isinstance(ent, t.Channel) or not ent.broadcast:
+                continue
+            rights = getattr(ent, "admin_rights", None)
+            if ent.creator or (rights and rights.post_messages):
+                found.append((d.id, (ent.title or "")[:256], (ent.username or "")[:64]))
+        async with self.pool.acquire() as con:
+            async with con.transaction():
+                await con.execute("DELETE FROM poster_channels")
+                if found:
+                    await con.executemany(
+                        "INSERT INTO poster_channels (id, title, username, updated_at) VALUES ($1, $2, $3, now())",
+                        found,
+                    )
+                await con.execute("DELETE FROM settings WHERE key = 'poster_refresh'")
+        log.info("Каналов для постинга: %s", len(found))
+
     async def work(self) -> None:
         me = await self.client.get_me()
         name = f"{me.first_name or ''} @{me.username or me.id}".strip()
@@ -194,11 +220,22 @@ class Poster:
         log.info("Аккаунт %s на связи", name)
         await self.recover()
         last_beat = 0.0
+        last_refresh = -1e9
         loop = asyncio.get_running_loop()
         while not self.stop.is_set():
             if loop.time() - last_beat > 30:
                 await self.status("online", name)
                 last_beat = loop.time()
+                asked = await self.pool.fetchval("SELECT 1 FROM settings WHERE key = 'poster_refresh'")
+                if asked or loop.time() - last_refresh > 6 * 3600:
+                    try:
+                        await self.refresh_channels()
+                    except errors.FloodWaitError as e:
+                        log.warning("FloodWait при обновлении каналов: %s сек", e.seconds)
+                    except (errors.RPCError, ValueError) as e:
+                        log.warning("Не удалось обновить список каналов: %s", e)
+                        await self.pool.execute("DELETE FROM settings WHERE key = 'poster_refresh'")
+                    last_refresh = loop.time()
             row = await self.take()
             if not row:
                 await self.sleep(5)

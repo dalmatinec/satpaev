@@ -1,18 +1,20 @@
 """Публикация в канал: через аккаунт (постер Telethon, с премиум эмодзи) или через бота."""
 
+import asyncio
 import logging
 import os
+import shutil
 import uuid
 from datetime import datetime
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
 from aiogram.types import MessageEntity
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import config
-from ..db.models import Post, PosterStatus, Rate
+from ..db.models import BotChat, Post, PosterStatus, Rate, Setting
 from ..utils import fill_template, money, num, strip_custom_emoji, utcnow
 from . import settings
 
@@ -134,3 +136,103 @@ async def rates_post(session: AsyncSession, bot: Bot) -> tuple[str, list[dict]]:
         "ton": money(settings.get("ton_kzt")) if settings.get("ton_kzt") else "по запросу",
     }
     return fill_template(template, ents, values)
+
+
+# ---------------- мультипостинг ----------------
+
+MEDIA_EXT = {"photo": ".jpg", "video": ".mp4", "animation": ".mp4", "document": ""}
+
+
+def media_of(message) -> tuple[str | None, str, str]:
+    """(file_id, вид, имя файла) медиа из сообщения, которое умеет отправить аккаунт."""
+    if message.photo:
+        return message.photo[-1].file_id, "photo", ""
+    if message.animation:
+        return message.animation.file_id, "animation", message.animation.file_name or ""
+    if message.video:
+        return message.video.file_id, "video", message.video.file_name or ""
+    if message.document:
+        return message.document.file_id, "document", message.document.file_name or ""
+    return None, "", ""
+
+
+async def download_media(bot: Bot, file_id: str, kind: str, name: str = "") -> str:
+    folder = os.path.join(config.shared_dir, "media")
+    os.makedirs(folder, exist_ok=True)
+    ext = MEDIA_EXT.get(kind, "") or os.path.splitext(name)[1][:10]
+    path = os.path.join(folder, f"{uuid.uuid4().hex}{ext}")
+    await bot.download(file_id, destination=path)
+    return path
+
+
+def clone_media(path: str) -> str:
+    """Своя копия файла на каждый пост: очистка удаляет файл после отправки."""
+    if not path:
+        return ""
+    new = os.path.join(os.path.dirname(path), f"{uuid.uuid4().hex}{os.path.splitext(path)[1]}")
+    shutil.copyfile(path, new)
+    return new
+
+
+async def queue_account(session: AsyncSession, target: str, text: str, entities, media: str = "",
+                        media_kind: str = "", kind: str = "news") -> Post:
+    post = Post(kind=kind, mode="account", target=str(target), text=text, entities=entities or [],
+                media=media, media_kind=media_kind)
+    session.add(post)
+    await session.flush()
+    return post
+
+
+async def copy_by_bot(bot: Bot, target: str, from_chat: int, msg_id: int, text: str, entities, photo: str | None) -> tuple[bool, str]:
+    """Копия сообщения без пометки «переслано». Если Telegram не принял премиум эмодзи, шлём без них."""
+    try:
+        await bot.copy_message(target, from_chat, msg_id)
+        return True, "Опубликовано ботом"
+    except TelegramForbiddenError:
+        return False, "Бот не админ канала"
+    except TelegramBadRequest as e:
+        log.info("copy to %s failed: %s", target, e)
+    return await _send_by_bot(bot, target, text, entities, photo)
+
+
+async def request_refresh(session: AsyncSession) -> None:
+    """Попросить постер обновить список каналов аккаунта."""
+    await session.merge(Setting(key="poster_refresh", value=utcnow().isoformat()))
+    await session.commit()
+
+
+async def run_chats(bot: Bot, sm, from_chat: int, msg_id: int, admin_id: int) -> None:
+    """Копирует пост во все группы, где есть бот. Без пересылки, с сохранением оформления."""
+    sent = failed = 0
+    async with sm() as session:
+        chats = (await session.execute(
+            select(BotChat.id).where(BotChat.active.is_(True), BotChat.type.in_(("group", "supergroup")))
+        )).scalars().all()
+    gone = []
+    for chat_id in chats:
+        try:
+            await bot.copy_message(chat_id, from_chat, msg_id)
+            sent += 1
+        except TelegramRetryAfter as e:
+            await asyncio.sleep(e.retry_after + 1)
+            try:
+                await bot.copy_message(chat_id, from_chat, msg_id)
+                sent += 1
+            except Exception:
+                failed += 1
+        except TelegramForbiddenError:
+            failed += 1
+            gone.append(chat_id)
+        except TelegramBadRequest as e:
+            failed += 1
+            if "not found" in str(e).lower() or "kicked" in str(e).lower():
+                gone.append(chat_id)
+        await asyncio.sleep(0.1)
+    if gone:
+        async with sm() as session:
+            await session.execute(update(BotChat).where(BotChat.id.in_(gone)).values(active=False))
+            await session.commit()
+    try:
+        await bot.send_message(admin_id, f"💬 Пост в чаты: доставлено <b>{sent}</b>, ошибок <b>{failed}</b>")
+    except (TelegramBadRequest, TelegramForbiddenError):
+        pass

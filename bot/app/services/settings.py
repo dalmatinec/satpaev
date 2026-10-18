@@ -34,6 +34,8 @@ DEFAULTS: dict = {
     "backup_time": config.backup_time,
     "backup_last_day": "",
     "backup_last": {},
+    "sub_mode": "required",
+    "sub_channels": [{"chat": "@newssatbox", "url": "https://t.me/newssatbox", "title": "newssatbox"}],
 }
 
 

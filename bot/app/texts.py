@@ -29,6 +29,7 @@ GROUPS = {
     "ref": "👥 Рефералы",
     "reviews": "⭐ Отзывы",
     "names": "🏷 Статусы и названия",
+    "sub": "📢 Подписка на канал",
 }
 
 T = TextSpec
@@ -218,6 +219,19 @@ TEXTS: dict[str, TextSpec] = {
     "reviews_stats": T("reviews", "Средняя оценка", "Средняя оценка: <b>{avg}</b> из 5 · отзывов: <b>{count}</b>\n\n", ("avg", "count")),
     "reviews_empty": T("reviews", "Отзывов нет", "Отзывов пока нет, ваш может стать первым!"),
 
+    # ---------- подписка ----------
+    "sub_required": T("sub", "Обязательная подписка", (
+        "📢 Чтобы пользоваться ботом, подпишитесь на наш канал.\n"
+        "Там курсы, новости и розыгрыши.\n\n"
+        "После подписки нажмите «✅ Я подписался»."
+    )),
+    "sub_recommend": T("sub", "Рекомендация подписаться", (
+        "📢 Подпишитесь на наш канал: курсы, новости и розыгрыши.\n\n"
+        "Это необязательно, можно сразу перейти к боту."
+    )),
+    "sub_not_yet": T("sub", "Подписка не найдена", "Подписка не найдена. Подпишитесь и нажмите ещё раз.", plain=True),
+    "sub_thanks": T("sub", "Спасибо за подписку", "Спасибо за подписку! 💛", plain=True),
+
     # ---------- статусы и названия ----------
     "kind_stars": T("names", "Вид: звёзды", "⭐ Звёзды"),
     "kind_gift": T("names", "Вид: подарок", "🎁 NFT подарок"),
@@ -296,6 +310,10 @@ BUTTONS: dict[str, tuple[str, str]] = {
     "ref_payout": ("shop", "💬 Запросить выплату"),
     "reviews_channel": ("shop", "📢 Все отзывы в канале"),
 
+    "sub_channel": ("common", "📢 Подписаться на канал"),
+    "sub_check": ("common", "✅ Я подписался"),
+    "sub_continue": ("common", "➡️ Перейти к боту"),
+
     "cat_bots": ("shop", "🤖 Telegram боты"),
     "cat_sites": ("shop", "🌐 Сайты"),
     "cat_miniapp": ("shop", "📱 Mini App"),
@@ -329,12 +347,14 @@ SCREENS: dict[str, tuple[str, list[list[str]], str]] = {
     "order": ("📦 Карточка заказа", [["paid"], ["agree", "decline"], ["write_manager"], ["my_orders", "home_short"]], "orders"),
     "support": ("💬 Связь", [["finish_chat"]], "support"),
     "reviews": ("⭐ Отзывы", [["reviews_channel"], ["home"]], "reviews"),
+    "sub": ("📢 Подписка", [["sub_check"], ["sub_continue"]], "menu"),
 }
 SCREEN_KEYS = list(SCREENS)
 
 # раздел текстов: экран, куда вернуться после правки
 GROUP_NAV = {"main": "menu", "stars": "stars", "gifts": "gifts", "un": "un", "ex": "ex", "dev": "dev",
-             "orders": "orders", "support": "support", "ref": "ref", "reviews": "reviews", "names": "orders"}
+             "orders": "orders", "support": "support", "ref": "ref", "reviews": "reviews", "names": "orders",
+             "sub": "menu"}
 
 # ---------- картинки разделов ----------
 
@@ -346,6 +366,7 @@ IMAGES = {
     "dev": "🛠 Разработка",
     "ref": "👥 Рефералы",
     "support": "💬 Связь",
+    "sub": "📢 Подписка",
 }
 
 _VAR = re.compile(r"\{([a-z_]+)\}")
