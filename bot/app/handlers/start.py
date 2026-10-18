@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..cb import Nav
 from ..db.models import User
-from ..services import media, settings
+from ..services import media, settings, webapp
 from ..texts import MENU_KEYS, strip_html
 from ..ui import answer, mbtn, screen_kb, send_safe, show
 from ..utils import clean_username, h
@@ -16,9 +16,12 @@ router = Router(name="start")
 
 def main_kb(is_admin: bool = False):
     site = str(settings.get("site_url") or "")
+    app_url = webapp.url()
     buttons = {}
     for key in MENU_KEYS:
-        if key == "site" and site.startswith(("http://", "https://")):
+        if key == "site" and app_url:
+            buttons[key] = mbtn("site", web_app=app_url)  # откроется внутри Telegram
+        elif key == "site" and site.startswith(("http://", "https://")):
             buttons[key] = mbtn("site", url=site)
         else:
             buttons[key] = mbtn(key, Nav(to=key))

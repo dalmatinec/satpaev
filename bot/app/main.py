@@ -14,7 +14,7 @@ from .db import init_db
 from .handlers import build_routers
 from .handlers.subscribe import SubscriptionMiddleware
 from .middlewares import AppMiddleware, ResetStateMiddleware
-from .services import media, scheduler, settings, username_check
+from .services import media, scheduler, settings, username_check, webapp
 
 log = logging.getLogger("bot")
 
@@ -61,17 +61,14 @@ async def main() -> None:
     dp.errors.register(on_error)
 
     await bot.set_my_commands([BotCommand(command="start", description="Главное меню")])
-    for admin_id in config.admin_ids:  # /admin и /edit видны только админам
+    # /admin и /edit не показываем в списке команд даже админам: они работают, если их набрать
+    for admin_id in config.admin_ids:
         try:
-            await bot.set_my_commands(
-                [BotCommand(command="start", description="Главное меню"),
-                 BotCommand(command="admin", description="Админка"),
-                 BotCommand(command="edit", description="Режим редактирования вкл/выкл")],
-                scope=BotCommandScopeChat(chat_id=admin_id),
-            )
+            await bot.delete_my_commands(scope=BotCommandScopeChat(chat_id=admin_id))
         except Exception as e:
-            log.warning("Не удалось задать команды для %s: %s", admin_id, e)
+            log.warning("Не удалось убрать команды для %s: %s", admin_id, e)
     await media.verify(bot, sm)
+    await webapp.apply(bot)
     tick = asyncio.create_task(scheduler.run(bot, sm))
     api = None
     if config.api_port:

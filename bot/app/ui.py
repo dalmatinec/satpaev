@@ -12,6 +12,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InputMediaPhoto,
     Message,
+    WebAppInfo,
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -164,24 +165,28 @@ def kb(*rows: list[InlineKeyboardButton]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[list(r) for r in rows if r])
 
 
-def btn(text: str, cb=None, url: str | None = None, icon: str | None = None, style: str | None = None) -> InlineKeyboardButton:
+def btn(text: str, cb=None, url: str | None = None, icon: str | None = None, style: str | None = None,
+        web_app: str | None = None) -> InlineKeyboardButton:
     extra = {}
     if icon:
         extra["icon_custom_emoji_id"] = icon
     if style:
         extra["style"] = style
+    if web_app:
+        return InlineKeyboardButton(text=text, web_app=WebAppInfo(url=web_app), **extra)
     if url:
         return InlineKeyboardButton(text=text, url=url, **extra)
     data = cb.pack() if hasattr(cb, "pack") else str(cb)
     return InlineKeyboardButton(text=text, callback_data=data, **extra)
 
 
-def mbtn(key: str, cb=None, url: str | None = None, **values) -> InlineKeyboardButton:
+def mbtn(key: str, cb=None, url: str | None = None, web_app: str | None = None, **values) -> InlineKeyboardButton:
     """Кнопка из реестра: текст, премиум иконка и цвет настраиваются в админке."""
     from .services import settings
 
     spec = settings.button(key)
-    return btn(fill(spec["text"], values)[:64], cb, url=url, icon=spec["icon"] or None, style=spec["style"] or None)
+    return btn(fill(spec["text"], values)[:64], cb, url=url, icon=spec["icon"] or None, style=spec["style"] or None,
+               web_app=web_app)
 
 
 def back_menu() -> list[InlineKeyboardButton]:

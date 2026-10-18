@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...cb import Adm
 from ...db.models import Order, RefAccrual, Review, User
-from ...services import backup, posting, settings
+from ...services import backup, posting, settings, webapp
 from ...services.reviews import first_name, name_html, review_post, reviews_target
 from ...ui import answer, btn, kb, send_safe, show
 from ...utils import fdate, h, money, num, parse_number
@@ -365,6 +365,8 @@ async def op_set_num(ctx: Ctx) -> None:
 async def op_set_url(ctx: Ctx) -> None:
     if ctx.message is None:
         await settings.put(ctx.session, ctx.data["key"], "")
+        if ctx.data["key"] == "site_url":
+            await webapp.apply(ctx.bot)
         await _back(ctx)
         return
     value = (ctx.text or "").strip()
@@ -374,5 +376,7 @@ async def op_set_url(ctx: Ctx) -> None:
         await ctx.target.answer("Ссылка должна начинаться с https:// или t.me/")
         return
     await settings.put(ctx.session, ctx.data["key"], value[:256])
+    if ctx.data["key"] == "site_url":
+        await webapp.apply(ctx.bot)
     await _back(ctx)
 

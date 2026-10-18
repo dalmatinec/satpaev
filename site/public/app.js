@@ -26,6 +26,35 @@
     return "https://t.me/" + data.bot + (start ? "?start=" + encodeURIComponent(start) : "");
   }
 
+  // ---------- Telegram Web App: сайт открыт кнопкой внутри бота ----------
+  var TG = null;
+  if (/tgWebApp/.test(location.hash)) {
+    document.documentElement.classList.add("tg");
+    var tgs = document.createElement("script");
+    tgs.src = "https://telegram.org/js/telegram-web-app.js?59";
+    tgs.onload = function () {
+      var app = window.Telegram && window.Telegram.WebApp;
+      if (!app) return;
+      TG = app;
+      try {
+        app.ready();
+        app.expand();
+        app.setHeaderColor("#07040f");
+        app.setBackgroundColor("#07040f");
+      } catch (e) { /* старые версии Telegram */ }
+    };
+    document.head.appendChild(tgs);
+    // ссылки на бота и менеджера открываем самим Telegram, без браузера
+    document.addEventListener("click", function (e) {
+      var a = e.target.closest && e.target.closest('a[href^="https://t.me/"]');
+      if (!a || !TG) return;
+      e.preventDefault();
+      try { TG.HapticFeedback.impactOccurred("light"); } catch (x) { /* нет вибро */ }
+      TG.openTelegramLink(a.href);
+      if (data.bot && a.href.indexOf("https://t.me/" + data.bot) === 0) setTimeout(function () { TG.close(); }, 300);
+    });
+  }
+
   // ---------- подстановка данных (только textContent, без HTML: защита от XSS) ----------
   function applyLinks() {
     $$("[data-bot]").forEach(function (a) { a.href = botLink(); });
@@ -87,26 +116,30 @@
   // ---------- фон: мелкие звёзды ----------
   var canvas = $(".sky");
   if (canvas && canvas.getContext) {
-    var ctx = canvas.getContext("2d"), stars = [], W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var ctx = canvas.getContext("2d"), stars = [], W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 1.5), last = 0;
     var resize = function () {
       W = window.innerWidth; H = window.innerHeight;
       canvas.width = W * dpr; canvas.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       stars = [];
-      for (var i = 0, n = Math.min(160, Math.round(W * H / 9000)); i < n; i++) {
+      for (var i = 0, n = Math.min(finePointer ? 140 : 60, Math.round(W * H / 9000)); i < n; i++) {
         stars.push({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 1.1 + .2, t: Math.random() * 6.3, s: Math.random() * .02 + .004,
           c: Math.random() < .2 ? "#f0abfc" : "#e9e3ff" });
       }
     };
-    var draw = function () {
+    var draw = function (ts) {
+      // 24 кадра в секунду хватает для мерцания, процессор не греется
+      if (ts && ts - last < 42) { if (!reduce && !document.hidden) requestAnimationFrame(draw); return; }
+      last = ts || 0;
       ctx.clearRect(0, 0, W, H);
       for (var i = 0; i < stars.length; i++) {
-        var s = stars[i]; s.t += s.s;
+        var s = stars[i]; s.t += s.s * 2.5;
         ctx.globalAlpha = .25 + Math.sin(s.t) * .25 + .2;
         ctx.fillStyle = s.c; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.283); ctx.fill();
       }
       if (!reduce && !document.hidden) requestAnimationFrame(draw);
     };
-    resize(); window.addEventListener("resize", resize);
+    var rt = 0;
+    resize(); window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(resize, 150); });
     document.addEventListener("visibilitychange", function () { if (!document.hidden && !reduce) requestAnimationFrame(draw); });
     requestAnimationFrame(draw);
   }
@@ -114,12 +147,16 @@
   var glow = $(".cursor-glow");
   if (glow && finePointer && !reduce) {
     var gx = -999, gy = -999, cx = -999, cy = -999;
-    window.addEventListener("pointermove", function (e) { gx = e.clientX; gy = e.clientY; }, { passive: true });
-    (function loop() {
+    var moving = false;
+    var loop = function () {
       cx += (gx - cx) * .12; cy += (gy - cy) * .12;
-      glow.style.setProperty("--mx", cx + "px"); glow.style.setProperty("--my", cy + "px");
-      requestAnimationFrame(loop);
-    })();
+      glow.style.transform = "translate3d(" + cx + "px," + cy + "px,0)";
+      if (Math.abs(gx - cx) + Math.abs(gy - cy) > .5) requestAnimationFrame(loop); else moving = false;
+    };
+    window.addEventListener("pointermove", function (e) {
+      gx = e.clientX; gy = e.clientY;
+      if (!moving) { moving = true; requestAnimationFrame(loop); }
+    }, { passive: true });
   }
 
   var bar = $(".progress");
@@ -136,15 +173,6 @@
     $$(".reveal").forEach(function (el, i) { el.style.transitionDelay = (i % 4) * 70 + "ms"; io.observe(el); });
   } else {
     $$(".reveal").forEach(function (el) { el.classList.add("in"); });
-  }
-
-  // лёгкий 3D наклон куба за курсором
-  var cube = $(".cube");
-  if (cube && finePointer && !reduce) {
-    window.addEventListener("pointermove", function (e) {
-      var x = e.clientX / window.innerWidth - .5, y = e.clientY / window.innerHeight - .5;
-      cube.style.transform = "perspective(800px) rotateY(" + x * 14 + "deg) rotateX(" + (-y * 10) + "deg)";
-    }, { passive: true });
   }
 
   // ---------- обмен ----------

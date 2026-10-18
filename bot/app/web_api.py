@@ -23,6 +23,24 @@ log = logging.getLogger(__name__)
 SITE_TTL = 20
 _site_cache: tuple[float, dict] | None = None
 
+# для экрана «🌐 Сайт и Web App» в админке
+STATS: dict = {"running": False, "port": 0, "error": "", "last": 0.0, "hours": {}}
+
+
+def _hit() -> None:
+    now = time.time()
+    STATS["last"] = now
+    hour = int(now // 3600)
+    hours = STATS["hours"]
+    hours[hour] = hours.get(hour, 0) + 1
+    for old in [h for h in hours if h < hour - 24]:
+        del hours[old]
+
+
+def hits(last_hours: int = 24) -> int:
+    hour = int(time.time() // 3600)
+    return sum(v for h, v in STATS["hours"].items() if h > hour - last_hours)
+
 
 class Limiter:
     """Простой лимит: не больше N запросов за окно на один IP."""
@@ -86,6 +104,7 @@ async def _build_site(bot: Bot, sm) -> dict:
 def make_app(bot: Bot, sm) -> web.Application:
     async def site(request: web.Request) -> web.Response:
         global _site_cache
+        _hit()
         if not site_limit.allow(_ip(request)):
             return _json({"error": "too_many_requests"}, 429)
         now = time.monotonic()
@@ -98,6 +117,7 @@ def make_app(bot: Bot, sm) -> web.Application:
         return _json(_site_cache[1], cache=SITE_TTL)
 
     async def username(request: web.Request) -> web.Response:
+        _hit()
         if not user_limit.allow(_ip(request)):
             return _json({"error": "too_many_requests"}, 429)
         raw = (request.query.get("u") or "")[:40]
@@ -120,9 +140,17 @@ def make_app(bot: Bot, sm) -> web.Application:
     return app
 
 
-async def start(bot: Bot, sm, port: int) -> web.AppRunner:
-    runner = web.AppRunner(make_app(bot, sm), access_log=None)
-    await runner.setup()
-    await web.TCPSite(runner, "0.0.0.0", port).start()
+async def start(bot: Bot, sm, port: int) -> web.AppRunner | None:
+    """Запуск API. Если не получилось, бот работает дальше, а причина видна в админке."""
+    STATS["port"] = port
+    try:
+        runner = web.AppRunner(make_app(bot, sm), access_log=None)
+        await runner.setup()
+        await web.TCPSite(runner, "0.0.0.0", port).start()
+    except Exception as e:
+        STATS["error"] = str(e)[:200]
+        log.exception("API сайта не запустился")
+        return None
+    STATS["running"] = True
     log.info("API сайта слушает порт %s", port)
     return runner

@@ -171,7 +171,7 @@ async def more_menu(target, session: AsyncSession, cbd: Adm | None = None) -> No
              + " Режим редактирования", Adm(s="bt", a="mode"))],
         [btn("✏️ Тексты", Adm(s="tx")), btn("🔘 Кнопки и экраны", Adm(s="bt"))],
         [btn("🖼 Картинки", Adm(s="img")), btn("📢 Подписка на канал", Adm(s="sub"))],
-        [btn("⚙️ Настройки", Adm(s="set"))],
+        [btn("🌐 Сайт и Web App", Adm(s="web")), btn("⚙️ Настройки", Adm(s="set"))],
         [btn("👥 Рефералы", Adm(s="ref")), btn("💾 Бэкапы", Adm(s="bk"))],
         [btn("◀️ Админка", Adm(s="menu"))],
     ))

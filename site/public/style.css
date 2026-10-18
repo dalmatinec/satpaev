@@ -39,16 +39,13 @@ a { color: inherit; }
 /* ---------- фон ---------- */
 .bg { position: fixed; inset: 0; z-index: -2; pointer-events: none; overflow: hidden; }
 .ribbons { position: absolute; inset: -5%; width: 110%; height: 110%; }
-.rb { transform-origin: 50% 50%; }
-.rb-a { animation: sway1 22s ease-in-out infinite alternate; }
-.rb-b { animation: sway2 26s ease-in-out infinite alternate; }
-.rb-c { animation: sway1 18s ease-in-out infinite alternate; }
-.rb-d { animation: sway2 20s ease-in-out infinite alternate; }
-@keyframes sway1 { to { transform: translate(40px, 30px) rotate(2deg); } }
-@keyframes sway2 { to { transform: translate(-50px, -20px) rotate(-2deg); } }
+/* ленты двигаются одним слоем: размытие рисуется один раз, дальше только сдвиг на видеокарте */
+.ribbons { will-change: transform; transform: translateZ(0); }
+@media (hover: hover) and (pointer: fine) {
+  .ribbons { animation: drift 40s ease-in-out infinite alternate; }
+}
+@keyframes drift { to { transform: translate3d(-30px, 18px, 0) scale(1.03); } }
 .sky { position: absolute; inset: 0; width: 100%; height: 100%; }
-body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 100; opacity: .04;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
 .cursor-glow { position: fixed; left: 0; top: 0; width: 600px; height: 600px; margin: -300px 0 0 -300px; border-radius: 50%;
   pointer-events: none; z-index: -1; background: radial-gradient(circle, rgba(217, 70, 239, .12), transparent 60%);
   transform: translate3d(var(--mx, -999px), var(--my, -999px), 0); }
@@ -58,10 +55,13 @@ body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-in
 /* ---------- стекло ---------- */
 .glass {
   position: relative;
-  background: linear-gradient(160deg, var(--glass-2), var(--glass) 60%);
+  background: linear-gradient(160deg, rgba(52, 30, 104, .62), rgba(20, 11, 44, .78) 60%);
   border: 1px solid var(--stroke);
   box-shadow: 0 30px 80px -30px rgba(10, 0, 30, .9), inset 0 1px 0 rgba(255, 255, 255, .08);
-  backdrop-filter: blur(22px) saturate(150%); -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+/* размытие под стеклом только у шапки и только на компьютере */
+@media (hover: hover) and (pointer: fine) {
+  .nav.glass { background: rgba(20, 11, 44, .55); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
 }
 /* светящийся контур: ярче к краям, как на стекле */
 .glow-edge::before, .services::before, .feat::before, .ex::before, .calc::before, .check::before, .cta::before {
@@ -112,13 +112,13 @@ body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-in
 
 .hero-logo { position: relative; display: grid; place-items: center; min-height: 460px; }
 .halo { position: absolute; width: 80%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, rgba(192, 38, 211, .45), rgba(124, 58, 237, .2) 40%, transparent 70%);
-  filter: blur(30px); animation: pulse 6s ease-in-out infinite; }
+  will-change: transform, opacity; animation: pulse 6s ease-in-out infinite; }
 @keyframes pulse { 50% { transform: scale(1.12); opacity: .8; } }
-.cube { position: relative; width: min(78%, 330px); filter: drop-shadow(0 0 22px rgba(217, 70, 239, .8)) drop-shadow(0 0 60px rgba(124, 58, 237, .6));
-  animation: hover 7s ease-in-out infinite; }
+.cube { position: relative; width: min(78%, 330px); filter: drop-shadow(0 0 26px rgba(217, 70, 239, .75));
+  will-change: transform; animation: hover 7s ease-in-out infinite; }
 @keyframes hover { 50% { transform: translateY(-14px) rotate(1.5deg); } }
 .ring { position: absolute; bottom: 8%; width: 96%; filter: drop-shadow(0 0 12px rgba(217, 70, 239, .7)); }
-.ring-spark { animation: spark 6s linear infinite; }
+@media (hover: hover) and (pointer: fine) { .ring-spark { animation: spark 6s linear infinite; } }
 @keyframes spark { to { stroke-dashoffset: -1040; } }
 
 .services { border-radius: 26px; padding: 10px; }
@@ -298,7 +298,6 @@ body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-in
   .result-grid { grid-template-columns: 1fr; }
   .dev-list li { flex-direction: column; gap: 2px; }
   .dev-list span { text-align: left; }
-  .glass { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
 }
 @media (hover: none) { .cursor-glow { display: none; } }
 @media (prefers-reduced-motion: reduce) {
@@ -306,3 +305,7 @@ body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-in
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .reveal { opacity: 1; translate: none; }
 }
+
+/* внутри Telegram Web App */
+.tg .cursor-glow { display: none; }
+.tg body { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
