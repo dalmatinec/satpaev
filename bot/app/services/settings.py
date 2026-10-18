@@ -190,8 +190,6 @@ def layout(screen: str) -> list[list[str]]:
         seen.update(keys)
         if keys:
             clean.append(keys)
-    if screen == "menu" and "app" not in seen:  # кнопка приложения появилась позже сохранённой раскладки
-        clean.insert(0, ["app"])
     if screen != "menu":  # на служебных экранах кнопки не теряются, даже если раскладка старая
         for row in default:
             missing = [k for k in row if k not in seen]
