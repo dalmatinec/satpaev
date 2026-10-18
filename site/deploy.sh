@@ -51,12 +51,17 @@ fi
 
 IP="$(curl -4 -fsS https://api.ipify.org 2>/dev/null || echo IP_сервера)"
 
+# сборка: копия public в www с новой версией файлов, чтобы браузеры сразу брали свежий CSS и JS
+VERSION="$(date +%s)"
+rm -rf www && cp -a public www
+sed -i "s/__V__/${VERSION}/g" www/index.html
+
 if systemctl is-active --quiet nginx 2>/dev/null; then
   # ===== режим nginx: на сервере уже есть nginx =====
   echo "Найден nginx, подключаю сайт к нему."
   docker compose down >/dev/null 2>&1 || true
   mkdir -p "${WEB_ROOT}"
-  cp -a "${SITE_DIR}/public/." "${WEB_ROOT}/"
+  cp -a "${SITE_DIR}/www/." "${WEB_ROOT}/"
   chmod -R a+rX "${WEB_ROOT}"
 
   if [ -n "${SITE_ADDRESS:-}" ]; then LISTEN="listen 80; listen [::]:80;"; NAME="${SITE_ADDRESS}"
@@ -91,6 +96,7 @@ server {
         add_header Cache-Control "public";
     }
     location / {
+        add_header Cache-Control "no-cache";
         try_files \$uri \$uri/ /index.html;
     }
 }

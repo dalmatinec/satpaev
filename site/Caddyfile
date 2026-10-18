@@ -14,6 +14,9 @@
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
 	}
 
+	@html path / /index.html
+	header @html Cache-Control "no-cache"
+
 	@static path *.css *.js *.svg *.png *.jpg *.webp *.woff2
 	header @static Cache-Control "public, max-age=604800"
 
