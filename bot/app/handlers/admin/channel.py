@@ -16,9 +16,9 @@ from ...config import config
 from ...db.models import BotChat, Post, PosterChannel, User
 from ...services import posting, settings
 from ...states import AdmSt
-from ...ui import answer, btn, kb, show
+from ...ui import answer, btn, kb, say, show
 from ...utils import entities_from_store, entities_to_store, fdate, h, strip_custom_emoji
-from .common import screen
+from .common import Ctx, ask, op, screen
 
 router = Router(name="admin_channel")
 
@@ -66,6 +66,7 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
         [btn("💱 Отправить курсы", Adm(s="rates", a="post")), btn("📄 Очередь", Adm(s="ch", a="queue"))],
         [btn(f"👤 Мои каналы ({acc})", Adm(s="ch", a="mine")), btn(f"💬 Чаты с ботом ({chats})", Adm(s="ch", a="chats"))],
         [btn("🔁 Курсы и отзывы: аккаунт или бот", Adm(s="ch", a="mode"))],
+        [btn("🗑 Удалить пост по ссылке", Adm(s="ch", a="del_link"))],
         [btn("⚙️ Админка", Adm(s="menu"))],
     ))
 
@@ -130,6 +131,12 @@ async def on_channel(cb: CallbackQuery, callback_data: Adm, session: AsyncSessio
             return
         await session.commit()
         await view(cb, session, Adm(s="ch"))
+    elif a == "del_link":
+        await ask(cb, state, "del_post_link",
+                  "🗑 Пришлите ссылку на пост в канале: в Telegram нажмите на пост → «Копировать ссылку».\n"
+                  "Пример: <code>https://t.me/newssatbox/123</code>\n\n"
+                  "Удаляет бот, поэтому он должен быть админом канала с правом «Удалять сообщения». "
+                  "Telegram разрешает боту удалять посты не старше 48 часов.", Adm(s="ch"))
     elif a == "refresh":
         await posting.request_refresh(session)
         await answer(cb, "Постер обновит список в течение минуты", alert=True)
@@ -239,12 +246,22 @@ async def post_ok(cb: CallbackQuery, state: FSMContext, session: AsyncSession, s
     await state.clear()
     await show(cb, "⏳ Публикую...")
     report = []
+    post_kind = data.get("post_kind") or "news"
+    if post_kind == "rates" and settings.get("rates_delete_prev"):
+        # прошлый курс убираем из тех каналов, куда сейчас идёт новый
+        targets = {str(o["target"]) for o in chosen if o["type"] in ("acc", "botch")}
+        if targets:
+            done, fail = await posting.delete_previous(cb.bot, session, "rates", targets)
+            if done:
+                report.append(f"🗑 Прошлый курс удалён из канала: {done}")
+            if fail:
+                report.append(f"⚠️ Не удалось удалить старых постов: {fail} (старше 48 часов или у бота нет права "
+                              "удалять сообщения). Удалите их вручную или через «🗑 Удалить пост по ссылке».")
     acc = [o for o in chosen if o["type"] == "acc"]
     if acc and data.get("account_ok"):
         base = ""
         if data.get("file_id"):
             base = await posting.download_media(cb.bot, data["file_id"], data["kind"], data.get("name", ""))
-        post_kind = data.get("post_kind") or "news"
         if post_kind == "rates":  # прошлые неотправленные курсы в очереди больше не нужны
             await posting.cancel_pending(session, "rates")
         for o in acc:
@@ -264,6 +281,9 @@ async def post_ok(cb: CallbackQuery, state: FSMContext, session: AsyncSession, s
         if o["type"] == "botch":
             ok, info = await posting.copy_by_bot(cb.bot, o["target"], data["from_chat"], data["msg_id"],
                                                  data["text"], data["entities"], data.get("photo"))
+            if ok:
+                await posting.record_bot_post(session, post_kind, o["target"], data["text"])
+                await session.commit()
             report.append(("✅ " if ok else "⚠️ ") + f"{o['title']}: {info}")
     if any(o["type"] == "chats" for o in chosen):
         asyncio.create_task(posting.run_chats(cb.bot, sm, data["from_chat"], data["msg_id"], cb.from_user.id))
@@ -312,3 +332,28 @@ async def start_text_post(cb: CallbackQuery, state: FSMContext, session: AsyncSe
         "post_kind": "rates" if history else "news",
     })
     await _targets_screen(msg, state)
+
+
+@op("del_post_link")
+async def op_del_post_link(ctx: Ctx) -> None:
+    parsed = posting.parse_post_link(ctx.text or "")
+    if not parsed:
+        await say(ctx.target, "Это не ссылка на пост. Пример: <code>https://t.me/newssatbox/123</code>")
+        return
+    chat, msg_id = parsed
+    await ctx.state.clear()
+    try:
+        await ctx.bot.delete_message(chat, msg_id)
+        text = "✅ Пост удалён из канала."
+        await ctx.session.execute(Post.__table__.update().where(Post.remote_id == msg_id).values(status="deleted"))
+        await ctx.session.commit()
+    except Exception as e:
+        err = str(e).lower()
+        if "not found" in err:
+            text = "Пост не найден: уже удалён или ссылка неверная."
+        elif "can't be deleted" in err or "rights" in err or "forbidden" in err or "not enough" in err:
+            text = ("⚠️ Бот не может удалить этот пост: он старше 48 часов или у бота нет права «Удалять сообщения». "
+                    "Удалите его вручную или дайте боту право в настройках канала.")
+        else:
+            text = f"⚠️ Не получилось: {h(str(e))[:200]}"
+    await show(ctx.target, text, kb([btn("🗑 Удалить ещё", Adm(s="ch", a="del_link"))], [btn("◀️ Посты", Adm(s="ch"))]))

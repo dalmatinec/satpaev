@@ -83,6 +83,7 @@ async def publish(
     session.add(post)
     await session.flush()
     ok, info = await _send_by_bot(bot, target, text, entities, photo_file_id)
+    post.remote_id = _last_sent["id"] if ok else None
     post.status = "sent" if ok else "failed"
     post.error = "" if ok else info
     post.sent_at = utcnow() if ok else None
@@ -90,15 +91,20 @@ async def publish(
     return ok, info
 
 
+_last_sent: dict = {"id": None}  # id последнего сообщения, отправленного ботом в канал (для удаления потом)
+
+
 async def _send_by_bot(bot: Bot, target: str, text: str, entities, photo) -> tuple[bool, str]:
     attempts = [entities or [], strip_custom_emoji(entities)]
     last_error = ""
+    _last_sent["id"] = None
     for ents in attempts:
         try:
             if photo:
-                await bot.send_photo(target, photo, caption=text[:1024], caption_entities=_entities(ents), parse_mode=None)
+                m = await bot.send_photo(target, photo, caption=text[:1024], caption_entities=_entities(ents), parse_mode=None)
             else:
-                await bot.send_message(target, text, entities=_entities(ents), parse_mode=None)
+                m = await bot.send_message(target, text, entities=_entities(ents), parse_mode=None)
+            _last_sent["id"] = m.message_id
             note = "" if ents == (entities or []) else " (премиум эмодзи боту в канал недоступны, отправлено без них)"
             return True, "Опубликовано ботом" + note
         except TelegramForbiddenError:
@@ -153,6 +159,63 @@ async def rates_post(session: AsyncSession, bot: Bot) -> tuple[str, list[dict]]:
                 if settings.get("ex_fee") else "без сбора"),
     }
     return fill_template(template, ents, values)
+
+
+# ---------------- удаление старых постов в канале ----------------
+
+def _chat(target: str):
+    t = (target or "").strip()
+    return int(t) if t.lstrip("-").isdigit() else t
+
+
+async def record_bot_post(session: AsyncSession, kind: str, target: str, text: str) -> None:
+    """Запомнить пост, отправленный ботом, чтобы потом его можно было удалить."""
+    if _last_sent["id"]:
+        session.add(Post(kind=kind, mode="bot", target=str(target), text=text[:4000], entities=[],
+                         status="sent", remote_id=_last_sent["id"], sent_at=utcnow()))
+
+
+async def delete_previous(bot: Bot, session: AsyncSession, kind: str = "rates",
+                          targets: set[str] | None = None) -> tuple[int, int]:
+    """Удаляет из каналов прошлые посты этого вида (бот должен быть админом с правом удалять сообщения).
+
+    Telegram даёт боту удалять сообщения не старше 48 часов: более старые нужно удалить вручную.
+    Возвращает (удалено, не получилось).
+    """
+    q = select(Post).where(Post.kind == kind, Post.status == "sent", Post.remote_id.is_not(None))
+    rows = (await session.execute(q.order_by(Post.id.desc()).limit(50))).scalars().all()
+    done = fail = 0
+    for p in rows:
+        if targets is not None and str(p.target) not in targets:
+            continue
+        try:
+            await bot.delete_message(_chat(p.target), int(p.remote_id))
+            p.status = "deleted"
+            done += 1
+        except TelegramBadRequest as e:
+            if "not found" in str(e).lower():  # уже удалён руками
+                p.status = "deleted"
+            else:
+                log.info("delete post #%s failed: %s", p.id, e)
+                fail += 1
+        except Exception as e:
+            log.info("delete post #%s failed: %s", p.id, e)
+            fail += 1
+    await session.commit()
+    return done, fail
+
+
+def parse_post_link(link: str) -> tuple[str | int, int] | None:
+    """t.me/channel/123 или t.me/c/1234567890/123 → (чат, номер сообщения)."""
+    import re
+
+    m = re.search(r"t\.me/c/(\d+)/(\d+)", link or "")
+    if m:
+        return int("-100" + m.group(1)), int(m.group(2))
+    m = re.search(r"t\.me/([A-Za-z0-9_]{4,})/(\d+)", link or "")
+    if m and m.group(1) != "c":
+        return "@" + m.group(1), int(m.group(2))
+    return None
 
 
 # ---------------- посты товаров: подарок, юзер, звёзды, Premium ----------------
@@ -285,8 +348,10 @@ async def queue_account(session: AsyncSession, target: str, text: str, entities,
 
 async def copy_by_bot(bot: Bot, target: str, from_chat: int, msg_id: int, text: str, entities, photo: str | None) -> tuple[bool, str]:
     """Копия сообщения без пометки «переслано». Если Telegram не принял премиум эмодзи, шлём без них."""
+    _last_sent["id"] = None
     try:
-        await bot.copy_message(target, from_chat, msg_id)
+        m = await bot.copy_message(target, from_chat, msg_id)
+        _last_sent["id"] = m.message_id
         return True, "Опубликовано ботом"
     except TelegramForbiddenError:
         return False, "Бот не админ канала"

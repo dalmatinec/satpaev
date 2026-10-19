@@ -47,6 +47,9 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
     b.row(btn("📢 Отправить курсы", Adm(s="rates", a="post"), style="primary"))
     b.row(btn("🧾 Шаблон поста", Adm(s="rates", a="tpl")),
           btn(f"⏳ Действует: {num(settings.get('rates_valid_hours') or 3)} ч", Adm(s="rates", a="valid")))
+    b.row(btn(f"🗑 Удалять прошлый курс: {'вкл' if settings.get('rates_delete_prev') else 'выкл'}",
+              Adm(s="rates", a="delprev")),
+          btn("🗑 Удалить прошлый сейчас", Adm(s="rates", a="delnow")))
     b.row(btn("📜 История курсов", Adm(s="rates", a="hist")),
           btn(f"🌙 Сброс в полночь: {'вкл' if settings.get('rates_reset') else 'выкл'}", Adm(s="rates", a="reset")))
     b.row(btn("⚙️ Админка", Adm(s="menu")))
@@ -174,6 +177,19 @@ async def on_rates(cb: CallbackQuery, callback_data: Adm, session: AsyncSession,
         await settings.put(session, "rates_day", settings.today())
         await session.commit()
         await answer(cb, "Курсы подтверждены на сегодня")
+        await view(cb, session, Adm(s="rates"))
+    elif a == "delprev":
+        await settings.put(session, "rates_delete_prev", not settings.get("rates_delete_prev"))
+        await session.commit()
+        await view(cb, session, Adm(s="rates"))
+    elif a == "delnow":
+        done, fail = await posting.delete_previous(cb.bot, session, "rates")
+        if not done and not fail:
+            msg = ("Бот не нашёл опубликованных постов с курсами, которые можно удалить. Если пост старый или отправлен "
+                   "до этого обновления: 📢 Посты → «🗑 Удалить пост по ссылке».")
+        else:
+            msg = f"🗑 Удалено: {done}" + (f"\n⚠️ Не получилось: {fail} (старше 48 часов или нет права удалять)" if fail else "")
+        await answer(cb, msg, alert=True)
         await view(cb, session, Adm(s="rates"))
     elif a == "reset":
         await settings.put(session, "rates_reset", not settings.get("rates_reset"))
