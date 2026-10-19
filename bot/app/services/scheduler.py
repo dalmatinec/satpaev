@@ -14,7 +14,7 @@ from ..config import config
 from ..db.models import Post, Reminder, SupportLink
 from ..ui import btn, kb
 from ..utils import utcnow
-from . import backup, settings
+from . import backup, posting, settings
 from .orders import notify_admins
 
 log = logging.getLogger(__name__)
@@ -51,6 +51,19 @@ async def _daily_backup(bot: Bot, sm) -> None:
     await backup.make_backup(bot, sm)
 
 
+async def _midnight(sm) -> None:
+    """После полуночи (часовой пояс из настроек): вчерашние неотправленные курсы убираем из очереди."""
+    today = settings.today()
+    if settings.get("midnight_day") == today:
+        return
+    first = not settings.is_set("midnight_day")  # первый запуск: только запоминаем день
+    async with sm() as session:
+        if settings.get("rates_reset") and not first:
+            await posting.cancel_pending(session, "rates")
+        await settings.put(session, "midnight_day", today)
+        await session.commit()
+
+
 async def _cleanup(sm) -> None:
     month_ago = utcnow() - timedelta(days=30)
     async with sm() as session:
@@ -77,6 +90,7 @@ async def run(bot: Bot, sm) -> None:
         try:
             await _reminders(bot, sm)
             await _daily_backup(bot, sm)
+            await _midnight(sm)
             if time.monotonic() - last_cleanup > 3600:
                 await _cleanup(sm)
                 last_cleanup = time.monotonic()

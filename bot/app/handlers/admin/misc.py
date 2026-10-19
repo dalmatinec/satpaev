@@ -10,6 +10,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...cb import Adm
+from ...config import config
 from ...db.models import Order, RefAccrual, Review, User
 from ...services import backup, posting, settings, webapp
 from ...services.reviews import first_name, name_html, review_post, reviews_target
@@ -265,6 +266,30 @@ def _onoff(v) -> str:
     return "вкл" if v else "выкл"
 
 
+# часто нужные пояса; любой другой можно вписать вручную (например, Asia/Tashkent)
+TIMEZONES = [
+    ("Asia/Almaty", "🇰🇿 Казахстан"),
+    ("Europe/Moscow", "🇷🇺 Москва"),
+    ("Asia/Tashkent", "🇺🇿 Ташкент"),
+    ("Asia/Bishkek", "🇰🇬 Бишкек"),
+    ("Asia/Dubai", "🇦🇪 Дубай"),
+    ("Europe/Istanbul", "🇹🇷 Стамбул"),
+    ("Europe/Kyiv", "🇺🇦 Киев"),
+    ("UTC", "🌐 UTC"),
+]
+
+
+def _tz_label() -> str:
+    from datetime import datetime
+
+    from ...config import config
+
+    key = str(getattr(config.tz, "key", config.tz))
+    name = dict(TIMEZONES).get(key, key)
+    offset = datetime.now(config.tz).strftime("%z")
+    return f"{name} (UTC{offset[:3]}:{offset[3:]})" if offset else name
+
+
 @screen("set")
 async def set_view(target, session: AsyncSession, cbd: Adm) -> None:
     site = settings.get("site_url") or "нет"
@@ -272,6 +297,7 @@ async def set_view(target, session: AsyncSession, cbd: Adm) -> None:
         "⚙️ <b>Настройки</b>\n\n"
         f"🏷 Название: <b>{h(settings.get('brand'))}</b>\n"
         f"💰 Минимальный заказ: <b>{money(settings.min_order())}</b>\n"
+        f"🌍 Часовой пояс: <b>{h(_tz_label())}</b>\n"
         f"🕐 Рабочее время: <b>{_onoff(settings.get('work_enabled'))}</b>, "
         f"с <b>{h(settings.get('work_from'))}</b> до <b>{h(settings.get('work_to'))}</b>\n"
         f"💎 Наценка на юзеры: <b>x{num(settings.get('uname_markup'))}</b>\n"
@@ -285,7 +311,8 @@ async def set_view(target, session: AsyncSession, cbd: Adm) -> None:
     )
     await show(target, text, kb(
         [btn("🏷 Название", Adm(s="set", a="brand")), btn("💰 Мин. заказ", Adm(s="set", a="num", v="min_order"))],
-        [btn(f"🕐 Время работы: {_onoff(settings.get('work_enabled'))}", Adm(s="set", a="work"))],
+        [btn(f"🕐 Время работы: {_onoff(settings.get('work_enabled'))}", Adm(s="set", a="work")),
+         btn("🌍 Часовой пояс", Adm(s="set", a="tz"))],
         [btn("▶️ Начало", Adm(s="set", a="time", v="work_from")), btn("⏹ Конец", Adm(s="set", a="time", v="work_to"))],
         [btn("💎 Наценка на юзеры", Adm(s="set", a="num", v="uname_markup")),
          btn("🔒 Дни удержания", Adm(s="set", a="num", v="uname_hold_days"))],
@@ -312,6 +339,22 @@ async def on_set(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, s
     back = Adm(s="set")
     if a == "brand":
         await ask(cb, state, "set_text", "🏷 Введите название магазина:", back, key="brand")
+    elif a == "tz":
+        rows = [[btn(("✅ " if str(getattr(config.tz, "key", "")) == key else "") + name, Adm(s="set", a="tzset", v=key))]
+                for key, name in TIMEZONES]
+        rows.append([btn("✏️ Ввести другой", Adm(s="set", a="tzinput"))])
+        rows.append([btn("◀️ Настройки", back)])
+        await show(cb, "🌍 <b>Часовой пояс</b>\n\nПо нему ставятся дата и время в постах, сброс курсов в полночь, "
+                       "время бэкапа, рабочие часы и статистика «за сегодня».\n\n"
+                       f"Сейчас: <b>{h(_tz_label())}</b>", kb(*rows))
+    elif a == "tzset" and key:
+        await settings.put(session, "timezone", key)
+        await session.commit()
+        await answer(cb, "Часовой пояс: " + _tz_label())
+        await set_view(cb, session, back)
+    elif a == "tzinput":
+        await ask(cb, state, "set_tz", "✏️ Пришлите название пояса, например <code>Asia/Almaty</code>, "
+                  "<code>Europe/Moscow</code>, <code>Asia/Tashkent</code>:", back)
     elif a == "menukb":
         await settings.put(session, "menu_kb_enabled", not settings.get("menu_kb_enabled"))
         await session.commit()
@@ -387,3 +430,17 @@ async def op_set_url(ctx: Ctx) -> None:
         await webapp.apply(ctx.bot)
     await _back(ctx)
 
+
+
+@op("set_tz")
+async def op_set_tz(ctx: Ctx) -> None:
+    from zoneinfo import ZoneInfo
+
+    name = (ctx.text or "").strip()
+    try:
+        ZoneInfo(name)
+    except Exception:
+        await say(ctx.target, "Не знаю такой пояс. Пример: <code>Asia/Almaty</code>")
+        return
+    await settings.put(ctx.session, "timezone", name)
+    await _back(ctx)

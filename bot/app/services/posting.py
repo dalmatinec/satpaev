@@ -265,6 +265,15 @@ def clone_media(path: str) -> str:
     return new
 
 
+async def cancel_pending(session: AsyncSession, kind: str) -> int:
+    """Убрать из очереди аккаунта неотправленные посты этого вида (например, вчерашние курсы)."""
+    res = await session.execute(
+        update(Post).where(Post.mode == "account", Post.kind == kind, Post.status.in_(("pending", "failed")))
+        .values(status="canceled", error="Заменён более свежим постом")
+    )
+    return res.rowcount or 0
+
+
 async def queue_account(session: AsyncSession, target: str, text: str, entities, media: str = "",
                         media_kind: str = "", kind: str = "news") -> Post:
     post = Post(kind=kind, mode="account", target=str(target), text=text, entities=entities or [],

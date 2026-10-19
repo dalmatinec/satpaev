@@ -22,7 +22,7 @@ from .common import screen
 
 router = Router(name="admin_channel")
 
-POST_ICONS = {"pending": "⏳", "sending": "📤", "sent": "✅", "failed": "⚠️", "unknown": "❔"}
+POST_ICONS = {"pending": "⏳", "sending": "📤", "sent": "✅", "failed": "⚠️", "unknown": "❔", "canceled": "🚫"}
 GROUP_TYPES = ("group", "supergroup")
 
 
@@ -244,9 +244,13 @@ async def post_ok(cb: CallbackQuery, state: FSMContext, session: AsyncSession, s
         base = ""
         if data.get("file_id"):
             base = await posting.download_media(cb.bot, data["file_id"], data["kind"], data.get("name", ""))
+        post_kind = data.get("post_kind") or "news"
+        if post_kind == "rates":  # прошлые неотправленные курсы в очереди больше не нужны
+            await posting.cancel_pending(session, "rates")
         for o in acc:
             media = posting.clone_media(base) if base else ""
-            await posting.queue_account(session, o["target"], data["text"], data["entities"], media, data["kind"] or "")
+            await posting.queue_account(session, o["target"], data["text"], data["entities"], media, data["kind"] or "",
+                                        kind=post_kind)
         await session.commit()
         if base:
             try:
@@ -305,5 +309,6 @@ async def start_text_post(cb: CallbackQuery, state: FSMContext, session: AsyncSe
         "from_chat": msg.chat.id, "msg_id": msg.message_id, "text": text[:1024] if photo else text, "entities": ents or [],
         "file_id": photo, "kind": "photo" if photo else "", "name": "", "account_ok": True, "photo": photo,
         "opts": await _options(session, cb.bot), "back": back.pack(), "history": history,
+        "post_kind": "rates" if history else "news",
     })
     await _targets_screen(msg, state)

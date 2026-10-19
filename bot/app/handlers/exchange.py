@@ -63,6 +63,11 @@ async def ex_view(target, session: AsyncSession) -> None:
         select(Rate).where(Rate.is_active.is_(True)).order_by(Rate.sort, Rate.id)
     )).scalars().all()
     rates = [r for r in rates if r.buy or r.sell]
+    if rates and not settings.rates_fresh():  # после полуночи вчерашний курс не показываем
+        await show(target, t("ex_stale"), screen_kb("ex", {
+            "write_manager": mbtn("write_manager", Nav(to="support")), "home": back_menu()[0]}),
+            photo=media.photo("ex"), edit=("ex_stale", "ex"))
+        return
     if not rates:
         await show(target, t("ex_empty"), screen_kb("ex", {
             "write_manager": mbtn("write_manager", Nav(to="support")), "home": back_menu()[0]}),
@@ -100,7 +105,7 @@ async def pair_view(target, r: Rate) -> None:
 @router.callback_query(Shop.filter((F.sec == "ex") & (F.a == "pair")))
 async def pair(cb: CallbackQuery, callback_data: Shop, session: AsyncSession) -> None:
     r = await session.get(Rate, callback_data.i)
-    if not r or not r.is_active:
+    if not r or not r.is_active or not settings.rates_fresh():
         await ex_view(cb, session)
         return
     await pair_view(cb, r)
@@ -129,6 +134,10 @@ async def amount_input(message: Message, state: FSMContext, session: AsyncSessio
         await say(message, t("ex_bad_amount"))
         return
     side = data.get("dir")
+    if not settings.rates_fresh():
+        await state.clear()
+        await ex_view(message, session)
+        return
     rate = r.sell if side == "buy" else r.buy
     if not rate:
         await say(message, t("ex_unavailable"))

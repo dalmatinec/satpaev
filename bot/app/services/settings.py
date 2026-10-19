@@ -24,7 +24,9 @@ DEFAULTS: dict = {
     "premium_plans": [[3, 17], [6, 32], [12, 60]],
     "premium_usd": 0,
     "ton_kzt": 0,
-    "rates_valid_hours": 3,  # «курс действует с 09:00 до 12:00»: сколько часов от момента публикации
+    "rates_valid_hours": 3,
+    "rates_reset": True,  # в полночь курсы считаются устаревшими, пока их не обновят или не подтвердят
+    "timezone": "",  # пусто = TZ из .env (по умолчанию Asia/Almaty)  # «курс действует с 09:00 до 12:00»: сколько часов от момента публикации
     "rates_history": [],  # последние публикации курсов (не больше 30)
     "ex_fee": 0,  # фиксированный сбор за каждую сделку обмена, ₸ (0 = без сбора)
     "ex_fee_name": "Сервисный сбор",
@@ -72,11 +74,43 @@ def _default_rich(key: str) -> Rich:
 _cache: dict = {}
 
 
+_DEFAULT_TZ = config.tz
+
+
+def apply_tz() -> None:
+    """Часовой пояс из админки (Настройки → 🌍). Меняет время везде: курсы, бэкап, рабочие часы, статистика."""
+    from zoneinfo import ZoneInfo
+
+    name = str(_cache.get("timezone") or "").strip()
+    try:
+        tz = ZoneInfo(name) if name else _DEFAULT_TZ
+    except Exception:
+        tz = _DEFAULT_TZ
+    object.__setattr__(config, "tz", tz)
+
+
+def today() -> str:
+    from datetime import datetime
+
+    return datetime.now(config.tz).strftime("%Y-%m-%d")
+
+
+def rates_fresh() -> bool:
+    """Курсы на сегодня: их обновили (или подтвердили) после полуночи по часовому поясу из настроек."""
+    if not get("rates_reset"):
+        return True
+    return str(get("rates_day") or "") == today()
+
+
 async def load(session_maker) -> None:
     async with session_maker() as session:
         rows = (await session.execute(select(Setting))).scalars().all()
         _cache.clear()
         _cache.update({r.key: r.value for r in rows})
+        apply_tz()
+        if "rates_day" not in _cache:  # первый запуск с этой функцией: текущие курсы считаем сегодняшними
+            await put(session, "rates_day", today())
+            await session.commit()
 
 
 def min_order():
@@ -101,6 +135,8 @@ def get(key: str):
 async def put(session: AsyncSession, key: str, value) -> None:
     await session.merge(Setting(key=key, value=value))
     _cache[key] = value
+    if key == "timezone":
+        apply_tz()
 
 
 async def reset(session: AsyncSession, key: str) -> None:

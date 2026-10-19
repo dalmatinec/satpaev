@@ -99,9 +99,11 @@ async def deep_link(payload: str, message: Message, state: FSMContext, session: 
 
         code = payload[3:].upper()[:16]
         r = await session.scalar(select(Rate).where(func.upper(Rate.code) == code, Rate.is_active.is_(True)))
-        if r:
+        if r and settings.rates_fresh():
             await exchange.pair_view(message, r)
             return True
+        await exchange.ex_view(message, session)
+        return True
     if payload.startswith("un_"):
         uname = clean_username(payload[3:])
         if uname:

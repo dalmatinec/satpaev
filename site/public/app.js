@@ -108,6 +108,7 @@
         data.brand = j.brand || data.brand;
         data.min_order = j.min_order || data.min_order;
         data.rates = Array.isArray(j.rates) ? j.rates : [];
+        data.rates_stale = !!j.rates_stale;
         data.ton_kzt = j.ton_kzt || 0;
         if (j.stars && Array.isArray(j.stars.tiers) && j.stars.tiers.length) data.stars = j.stars;
         data.texts = j.texts || {};
@@ -207,7 +208,8 @@
       if (fa) feeText(feeNote, ["+ " + (data.fee.name || "Сервисный сбор").toLowerCase() + " ", { b: tenge(fa) }, " за сделку"]);
     }
     if (!data.rates.length) {
-      var p = document.createElement("p"); p.className = "muted pad"; p.textContent = "Курс уточняйте в боте: нажмите «Обменять в боте».";
+      var p = document.createElement("p"); p.className = "muted pad"; p.textContent = data.rates_stale ? "Курс на сегодня обновляется, загляните чуть позже или спросите в боте."
+        : "Курс уточняйте в боте: нажмите «Обменять в боте».";
       ratesBox.appendChild(p);
     }
     data.rates.forEach(function (r) {

@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 from decimal import Decimal
 
 from aiogram import F, Router
@@ -8,9 +9,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...cb import Adm
+from ...config import config
 from ...db.models import Rate
 from ...services import posting, settings
-from ...ui import btn, kb, say, show
+from ...ui import answer, btn, kb, say, show
 from ...utils import Rich, entities_from_store, h, money, num, parse_number, rich_store
 from .common import Ctx, ask, op, screen
 
@@ -33,6 +35,9 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
     for r in rates:
         mark = "" if r.is_active else "🙈 "
         b.row(btn(f"{mark}{r.code} · покупка {num(r.buy)} · продажа {num(r.sell)}", Adm(s="rates", a="card", i=r.id)))
+    b.row(btn("⚡ Обновить все курсы сразу", Adm(s="rates", a="bulk"), style="primary"))
+    if not settings.rates_fresh():
+        b.row(btn("✅ Курсы на сегодня те же", Adm(s="rates", a="same")))
     b.row(btn("➕ Добавить валюту", Adm(s="rates", a="add")))
     ton = settings.get("ton_kzt")
     b.row(btn(f"💎 Курс TON: {money(ton) if ton else 'не задан'}", Adm(s="rates", a="ton")))
@@ -42,11 +47,16 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
     b.row(btn("📢 Отправить курсы", Adm(s="rates", a="post"), style="primary"))
     b.row(btn("🧾 Шаблон поста", Adm(s="rates", a="tpl")),
           btn(f"⏳ Действует: {num(settings.get('rates_valid_hours') or 3)} ч", Adm(s="rates", a="valid")))
-    b.row(btn("📜 История курсов", Adm(s="rates", a="hist")))
+    b.row(btn("📜 История курсов", Adm(s="rates", a="hist")),
+          btn(f"🌙 Сброс в полночь: {'вкл' if settings.get('rates_reset') else 'выкл'}", Adm(s="rates", a="reset")))
     b.row(btn("⚙️ Админка", Adm(s="menu")))
     await show(
         target,
-        "💱 <b>Курсы обмена</b>\n\n"
+        "💱 <b>Курсы обмена</b>\n"
+        + (f"📅 Сегодня {datetime.now(config.tz).strftime('%d.%m')}: " + ("✅ курсы обновлены" if settings.rates_fresh()
+           else "⚠️ <b>курсы вчерашние</b>, клиенты видят «курс обновляется». Обновите или нажмите «✅ Курсы на сегодня те же»")
+           + "\n\n")
+        + 
         "Покупка: по какому курсу вы покупаете у клиента.\nПродажа: по какому курсу продаёте клиенту.\n"
         "Курс TON нужен, чтобы показывать цены юзеров в тенге.\n"
         f"🧾 {h(settings.get('ex_fee_name') or 'Сервисный сбор')}: "
@@ -124,6 +134,16 @@ async def on_rates(cb: CallbackQuery, callback_data: Adm, session: AsyncSession,
                   key="ex_fee_name")
     elif a == "ton":
         await ask(cb, state, "set_ton", "💎 Введите курс 1 TON в тенге, например <code>1450</code>:", Adm(s="rates"))
+    elif a == "post" and not settings.rates_fresh():
+        await show(cb, "⚠️ <b>Курсы вчерашние</b>\n\nСначала обновите их на сегодня или подтвердите, что они те же. "
+                       "Так в пост не попадёт старый курс.",
+                   kb([btn("⚡ Обновить все курсы сразу", Adm(s="rates", a="bulk"), style="primary")],
+                      [btn("✅ Курсы те же, отправить", Adm(s="rates", a="same_post"))],
+                      [btn("◀️ Курсы", Adm(s="rates"))]))
+    elif a == "same_post":
+        await settings.put(session, "rates_day", settings.today())
+        await session.commit()
+        await on_rates(cb, Adm(s="rates", a="post"), session, state)
     elif a == "post":
         from .channel import start_text_post
 
@@ -150,6 +170,23 @@ async def on_rates(cb: CallbackQuery, callback_data: Adm, session: AsyncSession,
         body = "\n\n".join(lines) or "Пока пусто: история появится после первой публикации курсов."
         await show(cb, "📜 <b>История курсов</b>\nпокупаем / продаём, последние публикации\n\n" + body,
                    kb([btn("◀️ Курсы", Adm(s="rates"))]))
+    elif a == "same":
+        await settings.put(session, "rates_day", settings.today())
+        await session.commit()
+        await answer(cb, "Курсы подтверждены на сегодня")
+        await view(cb, session, Adm(s="rates"))
+    elif a == "reset":
+        await settings.put(session, "rates_reset", not settings.get("rates_reset"))
+        await session.commit()
+        await view(cb, session, Adm(s="rates"))
+    elif a == "bulk":
+        rates = (await session.execute(select(Rate).order_by(Rate.sort, Rate.id))).scalars().all()
+        current = "\n".join(f"{r.code} {num(r.buy) if r.buy else '-'} {num(r.sell) if r.sell else '-'}" for r in rates)
+        await ask(cb, state, "rates_bulk",
+                  "⚡ <b>Курсы на сегодня одним сообщением</b>\n\n"
+                  "Каждая строка: <b>валюта · покупаем · продаём</b>. «-» если не меняете в эту сторону.\n"
+                  "Новая валюта добавится сама. Можно скопировать текущие и поправить цифры:\n\n"
+                  f"<code>{h(current) or 'USDT 440 500'}</code>", Adm(s="rates"))
     elif a == "valid":
         await ask(cb, state, "set_num", "⏳ Сколько часов действует курс после публикации? Например <code>3</code>: "
                   "в посте будет «с 09:00 до 12:00».", Adm(s="rates"), key="rates_valid_hours")
@@ -193,6 +230,8 @@ async def op_rate_field(ctx: Ctx) -> None:
     if r:
         field = {"buy": "buy", "sell": "sell", "min": "min_qty"}[ctx.data["field"]]
         setattr(r, field, value)
+        if field in ("buy", "sell"):
+            await settings.put(ctx.session, "rates_day", settings.today())
         await ctx.session.commit()
     await rate_card(ctx.target, ctx.session, int(ctx.data["rate_id"]))
 
@@ -364,3 +403,46 @@ async def op_premium_plans(ctx: Ctx) -> None:
     await settings.put(ctx.session, "premium_plans", sorted(rows)[:6])
     await ctx.session.commit()
     await stars_view(ctx.target, ctx.session, Adm(s="stars"))
+
+
+@op("rates_bulk")
+async def op_rates_bulk(ctx: Ctx) -> None:
+    """«USDT 440 500» по строке на валюту: обновить всё за раз."""
+    rows = []
+    for line in (ctx.text or "").splitlines():
+        parts = line.replace(",", ".").split()
+        if len(parts) < 2:
+            continue
+        code = re.sub(r"[^A-Za-z0-9]", "", parts[0]).upper()[:16]
+        vals = []
+        for raw in parts[1:3]:
+            vals.append(None if raw in ("-", "—") else parse_number(raw))
+        while len(vals) < 2:
+            vals.append(None)
+        if code and any(v is not None for v in vals):
+            rows.append((code, vals[0], vals[1]))
+    if not rows:
+        await say(ctx.target, "Не нашёл ни одной строки. Формат: <code>USDT 440 500</code>")
+        return
+    await ctx.state.clear()
+    existing = {r.code.upper(): r for r in (await ctx.session.execute(select(Rate))).scalars().all()}
+    sort = max([r.sort for r in existing.values()] or [0])
+    changed = []
+    for code, buy, sell in rows:
+        r = existing.get(code)
+        if r is None:
+            sort += 1
+            r = Rate(code=code, sort=sort)
+            ctx.session.add(r)
+        if buy is not None:
+            r.buy = buy
+        if sell is not None:
+            r.sell = sell
+        r.is_active = True
+        changed.append(f"{code}: {num(r.buy) if r.buy else '-'} / {num(r.sell) if r.sell else '-'}")
+    await settings.put(ctx.session, "rates_day", settings.today())
+    await ctx.session.commit()
+    await show(ctx.target, "✅ <b>Курсы на сегодня обновлены</b>\n\n" + h("\n".join(changed))
+               + "\n\nСайт и бот уже считают по ним (сайт в течение минуты).",
+               kb([btn("📢 Отправить курсы", Adm(s="rates", a="post"), style="primary")],
+                  [btn("◀️ Курсы", Adm(s="rates"))]))

@@ -130,7 +130,8 @@ async def _build_site(bot: Bot, sm) -> dict:
         "bot": me.username,
         "min_order": float(settings.min_order()),
         "ton_kzt": float(settings.get("ton_kzt") or 0),
-        "rates": [
+        "rates_stale": not settings.rates_fresh(),
+        "rates": [] if not settings.rates_fresh() else [
             {"code": r.code, "buy": float(r.buy) if r.buy else None, "sell": float(r.sell) if r.sell else None,
              "min": float(r.min_qty) if r.min_qty else None}
             for r in rates if r.buy or r.sell
