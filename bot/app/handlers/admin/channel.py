@@ -239,7 +239,8 @@ async def post_toggle(cb: CallbackQuery, callback_data: AIn, state: FSMContext) 
 @router.callback_query(AdmSt.post_confirm, AIn.filter(F.a == "post_ok"))
 async def post_ok(cb: CallbackQuery, state: FSMContext, session: AsyncSession, sm) -> None:
     data = await state.get_data()
-    chosen = [o for o in (data.get("opts") or []) if o["on"]]
+    # публикуем только от бота: каналы аккаунта (тип acc) не используются
+    chosen = [o for o in (data.get("opts") or []) if o["on"] and o["type"] != "acc"]
     if not chosen:
         await answer(cb, "Отметьте хотя бы один канал или чат", alert=True)
         return
