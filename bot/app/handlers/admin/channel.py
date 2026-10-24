@@ -163,15 +163,8 @@ async def on_channel(cb: CallbackQuery, callback_data: Adm, session: AsyncSessio
 
 async def _options(session: AsyncSession, bot=None) -> list[dict]:
     opts: list[dict] = []
-    main = (config.channel_id or "").lstrip("@").lower()
-    if config.poster_enabled:
-        chans = (await session.execute(select(PosterChannel).order_by(PosterChannel.title).limit(40))).scalars().all()
-        for c in chans:
-            is_main = main and (main == (c.username or "").lower() or main == str(c.id))
-            opts.append({"type": "acc", "target": str(c.id), "title": f"👤 {c.title}", "on": bool(is_main)})
-        if not chans and config.channel_id:
-            opts.append({"type": "acc", "target": config.channel_id, "title": f"👤 {config.channel_id}", "on": True})
-    elif config.channel_id:
+    # посты только от бота: каналы аккаунта не предлагаем вообще
+    if config.channel_id:
         title = config.channel_id
         if bot is not None:
             try:
@@ -196,10 +189,8 @@ async def _targets_screen(target, state: FSMContext) -> None:
     chosen = sum(1 for o in opts if o["on"])
     rows.append([btn(f"📢 Опубликовать ({chosen})", AIn(a="post_ok"))])
     rows.append([btn("◀️ Отмена", Adm.unpack(data["back"]) if data.get("back") else Adm(s="ch"))])
-    note = "" if data.get("account_ok", True) else "\n\n⚠️ Такой тип сообщения аккаунт не публикует, он уйдёт только в чаты с ботом."
     text = ("📍 <b>Куда отправить?</b> Пост выше: так его увидят.\n\n"
-            "👤 ваши каналы (публикует ваш аккаунт, премиум эмодзи сохраняются)\n"
-            "📢 канал от имени бота\n💬 все группы, куда добавлен бот\n📨 личным сообщением всем клиентам бота" + note)
+            "📢 канал от имени бота\n💬 все группы, куда добавлен бот\n📨 личным сообщением всем клиентам бота")
     if not opts:
         text = "Некуда публиковать: укажите CHANNEL_ID в .env или добавьте бота в группу."
     await show(target, text, kb(*rows))
