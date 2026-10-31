@@ -9,7 +9,9 @@ from datetime import datetime
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
 from aiogram.types import MessageEntity
-from sqlalchemy import select, update
+from contextlib import suppress
+
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..cb import Cn
@@ -24,6 +26,7 @@ _tasks: set = set()
 DATE_RE = re.compile(r"^\s*(\d{1,2})\.(\d{1,2})\s+(\d{1,2}):(\d{2})\s*$")
 DEFAULT_RESULT = "🏆 Итоги конкурса! Победитель: {winner}. Поздравляем!"
 DEFAULT_LIST = "👥 Участники конкурса ({count}):"
+DEFAULT_BTN = "🎉 Участвовать"
 DEFAULT_DM = "🎉 Поздравляем, вы выиграли в конкурсе! Свяжитесь по контактам из условий конкурса, чтобы получить приз."
 
 
@@ -100,9 +103,18 @@ async def deep_link(bot: Bot, cid: int) -> str:
     return f"https://t.me/{me.username}?start=ct{cid}"
 
 
-async def join_kb(bot: Bot, cid: int):
-    """Кнопка-ссылка: при пересылке в канал Telegram сохраняет только такие кнопки."""
-    return kb([btn("🎉 Участвовать", url=await deep_link(bot, cid))])
+async def join_kb(bot: Bot, cid: int, label: str | None = None, count: int = 0):
+    """Кнопка-ссылка: при пересылке в канал Telegram сохраняет только такие кнопки. В скобках — участники."""
+    text = (label or DEFAULT_BTN) + (f" ({count})" if count else "")
+    return kb([btn(text, url=await deep_link(bot, cid))])
+
+
+async def finished_kb(bot: Bot, cid: int, count: int):
+    return kb([btn(f"🏁 Конкурс завершён · участников: {count}", url=await deep_link(bot, cid))])
+
+
+async def count_entries(session: AsyncSession, cid: int) -> int:
+    return await session.scalar(select(func.count(ContestEntry.id)).where(ContestEntry.contest_id == cid)) or 0
 
 
 def name_of(u: User | None, uid: int) -> str:
@@ -145,26 +157,35 @@ def list_texts(c: Contest, rows: list[tuple[int, str]]) -> list[str]:
     return chunks
 
 
-async def _send(bot: Bot, uid: int, rich: Rich, markup=None) -> str:
-    """ok / blocked / fail. Если Telegram не принял премиум эмодзи, шлём без них."""
+async def send_rich(bot: Bot, chat, rich: Rich, markup=None):
+    """(ok / blocked / fail, сообщение). Если Telegram не принял премиум эмодзи, шлём без них."""
     ents = rich.entities or []
     for variant in (ents, [e for e in ents if e.type != "custom_emoji"]):
         try:
-            await bot.send_message(uid, rich.text, entities=variant or None, parse_mode=None, reply_markup=markup)
-            return "ok"
+            m = await bot.send_message(chat, rich.text, entities=variant or None, parse_mode=None, reply_markup=markup)
+            return "ok", m
         except TelegramForbiddenError:
-            return "blocked"
+            return "blocked", None
         except TelegramRetryAfter:
             raise
         except TelegramBadRequest as e:
-            log.info("contest send to %s failed: %s", uid, e)
-    return "fail"
+            log.info("contest send to %s failed: %s", chat, e)
+    return "fail", None
 
 
-async def mailing(bot: Bot, sm, cid: int, text: Rich, admin_id: int) -> None:
+async def _send(bot: Bot, uid, rich: Rich, markup=None) -> str:
+    return (await send_rich(bot, uid, rich, markup))[0]
+
+
+async def _set_button(bot: Bot, chat: str, msg_id: int, markup) -> None:
+    with suppress(TelegramBadRequest, TelegramForbiddenError):
+        await bot.edit_message_reply_markup(chat_id=chat, message_id=msg_id, reply_markup=markup)
+
+
+async def mailing(bot: Bot, sm, cid: int, text: Rich, admin_id: int, label: str | None = None) -> None:
     sent = blocked = failed = 0
     last_id = 0
-    markup = await join_kb(bot, cid)
+    markup = await join_kb(bot, cid, label)
     try:
         while True:
             async with sm() as session:
@@ -197,6 +218,13 @@ async def mailing(bot: Bot, sm, cid: int, text: Rich, admin_id: int) -> None:
     except Exception:
         log.exception("contest mailing crashed")
     try:
+        async with sm() as session:
+            await session.execute(update(Contest).where(Contest.id == cid).values(
+                mail_sent=sent, mail_blocked=blocked, mail_failed=failed))
+            await session.commit()
+    except Exception:
+        log.exception("contest mailing stats")
+    try:
         await bot.send_message(
             admin_id,
             f"✅ Конкурс разослан клиентам\n\nДоставлено: <b>{sent}</b>\nЗаблокировали бота: <b>{blocked}</b>\n"
@@ -207,8 +235,8 @@ async def mailing(bot: Bot, sm, cid: int, text: Rich, admin_id: int) -> None:
         pass
 
 
-def start_mailing(bot: Bot, sm, cid: int, text: Rich, admin_id: int) -> None:
-    task = asyncio.create_task(mailing(bot, sm, cid, text, admin_id))
+def start_mailing(bot: Bot, sm, cid: int, text: Rich, admin_id: int, label: str | None = None) -> None:
+    task = asyncio.create_task(mailing(bot, sm, cid, text, admin_id, label))
     _tasks.add(task)
     task.add_done_callback(_tasks.discard)
 
@@ -231,6 +259,15 @@ async def tick(bot: Bot, sm) -> None:
     """Раз в проход планировщика: подводит итоги конкурсов, у которых вышло время."""
     notes = []
     async with sm() as session:
+        # счётчик на кнопке поста в канале: обновляем, если число участников изменилось
+        live = (await session.execute(
+            select(Contest).where(Contest.status == "active", Contest.pub_msg.is_not(None)))).scalars().all()
+        for c in live:
+            count = await count_entries(session, c.id)
+            if count != c.pub_count:
+                await _set_button(bot, c.pub_chat, c.pub_msg, await join_kb(bot, c.id, c.btn_text, count))
+                c.pub_count = count
+        await session.commit()
         due = (await session.execute(
             select(Contest).where(Contest.status == "active", Contest.ends_at <= utcnow())
         )).scalars().all()
@@ -239,6 +276,8 @@ async def tick(bot: Bot, sm) -> None:
             winner = random.choice(rows)[0] if rows else None
             c.status = "finished"
             c.winner_id = winner
+            if c.pub_msg:
+                await _set_button(bot, c.pub_chat, c.pub_msg, await finished_kb(bot, c.id, len(rows)))
             if winner is None:
                 notes.append({"winner": None})
                 continue

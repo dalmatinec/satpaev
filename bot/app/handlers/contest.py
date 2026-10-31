@@ -33,6 +33,8 @@ async def _try_join(bot, session: AsyncSession, user: User, cid: int) -> tuple[s
         return ALREADY, f"Вы уже участвуете. Итоги: {when} (время Алматы). Удачи! 🍀", None
     missing = await svc.missing_subs(bot, channels, user.id)
     if missing:
+        c.clicks_missing = (c.clicks_missing or 0) + 1
+        await session.commit()
         text = "Чтобы участвовать, подпишитесь:\n\n" + "\n".join(
             f"• {ch.get('title') or ch['chat']}" for ch in missing) + "\n\nЗатем нажмите «✅ Проверить»."
         return MISSING, text, svc.conditions_kb(cid, missing)

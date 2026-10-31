@@ -1,5 +1,7 @@
 """Админка: конкурс. Тексты (все редактируются), предпросмотр, рассылка, участники, итоги, список для канала."""
 
+from datetime import timedelta
+
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.fsm.context import FSMContext
@@ -19,44 +21,66 @@ router = Router(name="admin_contest")
 
 FIELD_PROMPTS = {
     "text": "✏️ <b>Текст поста</b>\n\nПришлите новый текст. Премиум эмодзи и форматирование сохранятся.",
-    "result": "✏️ <b>Текст поздравления</b> для канала. Вместо имени победителя поставьте <code>{winner}</code>. "
-              "Отправьте <code>-</code>, чтобы вернуть стандартный.",
+    "btn_text": "✏️ <b>Надпись на кнопке</b> (до 40 символов). Число участников бот добавит в скобках сам. "
+                "Отправьте <code>-</code>, чтобы вернуть стандартную.",
+    "result": "✏️ <b>Текст поздравления</b> (итоги для канала). Вместо имени победителя поставьте "
+              "<code>{winner}</code>. Отправьте <code>-</code>, чтобы вернуть стандартный.",
     "list_tpl": "✏️ <b>Шапка списка участников</b>. Вместо количества поставьте <code>{count}</code>. "
                 "Отправьте <code>-</code>, чтобы вернуть стандартную.",
     "dm_tpl": "✏️ <b>Личное сообщение победителю</b>. Отправьте <code>-</code>, чтобы вернуть стандартное.",
 }
+FIELD_NAMES = {"text": "Текст поста", "btn_text": "Надпись на кнопке", "result": "Поздравление (итоги)",
+               "list_tpl": "Шапка списка участников", "dm_tpl": "Личка победителю"}
 
 
 async def _active(session: AsyncSession):
     return await session.scalar(select(Contest).where(Contest.status == "active").limit(1))
 
 
-async def _count(session: AsyncSession, cid: int) -> int:
-    return await session.scalar(select(func.count(ContestEntry.id)).where(ContestEntry.contest_id == cid)) or 0
+async def _count(session: AsyncSession, cid: int, since=None) -> int:
+    q = select(func.count(ContestEntry.id)).where(ContestEntry.contest_id == cid)
+    if since is not None:
+        q = q.where(ContestEntry.created_at >= since)
+    return await session.scalar(q) or 0
 
 
 def _preview_kb(cid: int):
     return kb([btn("🚀 Запустить рассылку", Adm(s="ct", a="start", i=cid))],
-              [btn("✏️ Изменить текст", Adm(s="ct", a="edit", i=cid, v="text"))],
+              [btn("✏️ Тексты", Adm(s="ct", a="texts", i=cid))],
               [btn("📢 Каналы-условия", Adm(s="ct", a="chans", i=cid))],
               [btn("◀️ Отмена", Adm(s="ct", a="drop", i=cid))])
+
+
+async def _stats(session: AsyncSession, c: Contest) -> str:
+    now = utcnow()
+    midnight = now.astimezone(config.tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    total = await _count(session, c.id)
+    hour = await _count(session, c.id, now - timedelta(hours=1))
+    today = await _count(session, c.id, midnight)
+    lines = [f"👥 Участников: <b>{total}</b> (за час: +{hour}, сегодня: +{today})",
+             f"🚫 Нажали без подписки: <b>{c.clicks_missing or 0}</b>"]
+    if c.mail_sent or c.mail_blocked or c.mail_failed:
+        lines.append(f"📨 Рассылка: доставлено <b>{c.mail_sent}</b> · заблокировали {c.mail_blocked} · "
+                     f"ошибок {c.mail_failed}")
+    lines.append("📢 В канале: " + ("опубликован, счётчик на кнопке обновляется" if c.pub_msg else "не опубликован"))
+    lines.append(f"📋 Каналов в условиях: <b>{len(c.channels or [])}</b>")
+    return "\n".join(lines)
 
 
 @screen("ct")
 async def view(target, session: AsyncSession, cbd: Adm) -> None:
     active = await _active(session)
     if active:
-        count = await _count(session, active.id)
         link = await svc.deep_link(target.bot, active.id)
-        text = (f"🎁 <b>Конкурс идёт</b>\n\nУчастников: <b>{count}</b>\n"
-                f"Итоги: <b>{svc.deadline_text(active)}</b>, бот выберет победителя сам.\n"
-                f"Каналов в условиях: <b>{len(active.channels or [])}</b>\n\n"
-                f"Ссылка для поста в канале:\n<code>{link}</code>")
-        rows = [[btn("📢 Опубликовать в канал", Adm(s="ct", a="pub", i=active.id))],
-                [btn("👥 Участники", Adm(s="ct", a="list", i=active.id))],
-                [btn("📢 Каналы-условия", Adm(s="ct", a="chans", i=active.id))],
-                [btn("🎲 Подвести итоги сейчас", Adm(s="ct", a="end", i=active.id))],
-                [btn("⏹ Отменить конкурс", Adm(s="ct", a="cancel", i=active.id))]]
+        text = (f"🎁 <b>Конкурс идёт</b>\n\n{await _stats(session, active)}\n"
+                f"⏳ Итоги: <b>{svc.deadline_text(active)}</b>, бот выберет победителя сам.\n\n"
+                f"Ссылка на участие:\n<code>{link}</code>")
+        i = active.id
+        rows = [[btn("📢 Опубликовать в канал", Adm(s="ct", a="pub", i=i))],
+                [btn("👥 Участники", Adm(s="ct", a="list", i=i)), btn("✏️ Тексты", Adm(s="ct", a="texts", i=i))],
+                [btn("📢 Каналы-условия", Adm(s="ct", a="chans", i=i))],
+                [btn("🎲 Подвести итоги сейчас", Adm(s="ct", a="end", i=i))],
+                [btn("⏹ Отменить конкурс", Adm(s="ct", a="cancel", i=i))]]
     else:
         rows = []
         last = await session.scalar(
@@ -64,24 +88,63 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
         if last is None:
             text = "🎁 <b>Конкурс</b>\n\nКонкурсов ещё не было."
         else:
-            count = await _count(session, last.id)
-            text = (f"🎁 <b>Последний конкурс</b>\n\nИтоги: <b>{svc.deadline_text(last)}</b>\n"
-                    f"Участников: <b>{count}</b>\n")
+            i = last.id
+            text = (f"🎁 <b>Последний конкурс</b> · итоги {svc.deadline_text(last)}\n\n"
+                    f"{await _stats(session, last)}\n")
             if last.winner_id:
                 name = svc.name_of(await session.get(User, last.winner_id), last.winner_id)
-                text += (f"Победитель: {svc.mention(last.winner_id, name)}\n\n<b>Текст поздравления:</b>\n"
+                text += (f"\n🏆 Победитель: {svc.mention(last.winner_id, name)}\n\n<b>Текст итогов:</b>\n"
                          f"{svc.result_html(last, name)}")
-                rows.append([btn("🎲 Выбрать другого", Adm(s="ct", a="reroll", i=last.id))])
+                rows.append([btn("📢 Итоги в канал", Adm(s="ct", a="pubres", i=i)),
+                             btn("🎲 Другой победитель", Adm(s="ct", a="reroll", i=i))])
             else:
                 text += "\nУчастников не было."
-            rows.append([btn("👥 Участники", Adm(s="ct", a="list", i=last.id))])
-            rows.append([btn("📋 Прислать список для канала", Adm(s="ct", a="sendlist", i=last.id))])
-            rows.append([btn("✏️ Текст поздравления", Adm(s="ct", a="edit", i=last.id, v="result"))])
-            rows.append([btn("✏️ Шапка списка", Adm(s="ct", a="edit", i=last.id, v="list_tpl"))])
-            rows.append([btn("✏️ Личка победителю", Adm(s="ct", a="edit", i=last.id, v="dm_tpl"))])
+            rows.append([btn("📢 Список участников в канал", Adm(s="ct", a="publist", i=i))])
+            rows.append([btn("👥 Участники", Adm(s="ct", a="list", i=i)),
+                         btn("📋 Список мне", Adm(s="ct", a="sendlist", i=i))])
+            rows.append([btn("✏️ Тексты", Adm(s="ct", a="texts", i=i))])
     rows.append([btn("✍️ Новый конкурс", Adm(s="ct", a="new"))])
     rows.append([btn("◀️ Админка", Adm(s="menu"))])
     await show(target, text, kb(*rows))
+
+
+async def _texts_screen(target, session: AsyncSession, cid: int) -> None:
+    c = await session.get(Contest, cid)
+    if c is None:
+        await view(target, session, Adm(s="ct"))
+        return
+    current = {
+        "text": (c.text or "")[:120] + ("…" if len(c.text or "") > 120 else ""),
+        "btn_text": c.btn_text or svc.DEFAULT_BTN,
+        "result": c.result or svc.DEFAULT_RESULT,
+        "list_tpl": c.list_tpl or svc.DEFAULT_LIST,
+        "dm_tpl": c.dm_tpl or svc.DEFAULT_DM,
+    }
+    fields = list(FIELD_NAMES) if c.status == "draft" else [f for f in FIELD_NAMES if f != "text"]
+    text = "✏️ <b>Тексты конкурса</b>\n\n" + "\n\n".join(
+        f"<b>{FIELD_NAMES[f]}:</b>\n{h(current[f])}" for f in fields)
+    if c.status != "draft":
+        text += "\n\n<i>Текст поста уже разослан, его можно поправить прямо в канале.</i>"
+    rows = [[btn(f"✏️ {FIELD_NAMES[f]}", Adm(s="ct", a="edit", i=cid, v=f))] for f in fields]
+    back = Adm(s="ct", a="prev", i=cid) if c.status == "draft" else Adm(s="ct")
+    rows.append([btn("◀️ Назад", back)])
+    await show(target, text, kb(*rows))
+
+
+async def _to_channel(cb: CallbackQuery, texts: list[str]) -> None:
+    if not config.channel_id:
+        await answer(cb, "Канал не задан: укажите CHANNEL_ID в .env", alert=True)
+        return
+    try:
+        for t in texts:
+            await cb.bot.send_message(config.channel_id, t)
+    except TelegramForbiddenError:
+        await answer(cb, "⚠️ Бот не админ канала или нет права публиковать", alert=True)
+        return
+    except TelegramBadRequest as e:
+        await answer(cb, f"⚠️ Не удалось: {e}"[:190], alert=True)
+        return
+    await answer(cb, "✅ Опубликовано в канал", alert=True)
 
 
 @router.callback_query(Adm.filter(F.s == "ct"))
@@ -95,8 +158,11 @@ async def on_ct(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, st
                   "🎁 <b>Новый конкурс</b>\n\nПришлите текст: призы, условия и куда писать за призом "
                   "(например @set_fact). Премиум эмодзи и форматирование сохранятся.", Adm(s="ct"))
         return
+    if a == "texts":
+        await _texts_screen(cb, session, cid)
+        return
     if a == "edit" and field in FIELD_PROMPTS:
-        await ask(cb, state, "ct_edit", FIELD_PROMPTS[field], Adm(s="ct"), cid=cid, field=field)
+        await ask(cb, state, "ct_edit", FIELD_PROMPTS[field], Adm(s="ct", a="texts", i=cid), cid=cid, field=field)
         return
     if a == "list":
         await _show_list(cb, session, cid)
@@ -117,10 +183,31 @@ async def on_ct(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, st
         if not config.channel_id:
             await answer(cb, "Канал не задан: укажите CHANNEL_ID в .env", alert=True)
             return
-        res = await svc._send(cb.bot, config.channel_id, svc.body(c), await svc.join_kb(cb.bot, cid))
-        msg = {"ok": "✅ Опубликовано в канал с кнопкой «Участвовать». Премиум эмодзи можно поправить в канале.",
+        count = await _count(session, cid)
+        res, m = await svc.send_rich(cb.bot, config.channel_id, svc.body(c),
+                                     await svc.join_kb(cb.bot, cid, c.btn_text, count))
+        if res == "ok" and m is not None:
+            c.pub_chat, c.pub_msg, c.pub_count = str(m.chat.id), m.message_id, count
+            await session.commit()
+        msg = {"ok": "✅ Опубликовано в канал. На кнопке будет счётчик участников. Премиум эмодзи можно "
+                     "поправить в канале.",
                "blocked": "⚠️ Бот не админ канала или нет права публиковать"}.get(res, "⚠️ Не удалось опубликовать, см. логи")
         await answer(cb, msg, alert=True)
+        await view(cb, session, callback_data)
+        return
+    if a == "pubres":
+        c = await session.get(Contest, cid)
+        if c is None or not c.winner_id:
+            await answer(cb, "Победителя нет", alert=True)
+            return
+        name = svc.name_of(await session.get(User, c.winner_id), c.winner_id)
+        await _to_channel(cb, [svc.result_html(c, name)])
+        return
+    if a == "publist":
+        c = await session.get(Contest, cid)
+        if c is None:
+            return
+        await _to_channel(cb, svc.list_texts(c, await svc.participants(session, cid)))
         return
     if a == "chadd":
         c = await session.get(Contest, cid)
@@ -191,10 +278,10 @@ async def on_ct(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, st
         if await _active(session):
             await answer(cb, "Уже идёт другой конкурс", alert=True)
             return
-        text = svc.body(c)
+        text, label = svc.body(c), c.btn_text
         c.status = "active"
         await session.commit()
-        svc.start_mailing(cb.bot, sm, cid, text, cb.from_user.id)
+        svc.start_mailing(cb.bot, sm, cid, text, cb.from_user.id, label)
         await answer(cb, "Рассылка запущена")
     await view(cb, session, callback_data)
 
@@ -223,7 +310,7 @@ async def _show_list(cb: CallbackQuery, session: AsyncSession, cid: int) -> None
     if c is None:
         return
     chunks = svc.list_texts(c, await svc.participants(session, cid))
-    await show(cb, chunks[0] + "\n\nПолный список для канала: кнопка «📋 Прислать список для канала».",
+    await show(cb, chunks[0] + "\n\nПолный список: «📋 Список мне» или «📢 Список участников в канал».",
                kb([btn("◀️ Назад", Adm(s="ct"))]))
 
 
@@ -273,6 +360,13 @@ async def op_ct_edit(ctx: Ctx) -> None:
             return
         c.text = plain
         c.entities = entities_to_store(msg.entities) if msg is not None and msg.text else []
+    elif field == "btn_text":
+        label = (ctx.text or "").strip()
+        if not label or len(label) > 40:
+            await say(ctx.target, "Нужна надпись до 40 символов. Пришлите ещё раз:")
+            return
+        c.btn_text = None if label == "-" else label
+        c.pub_count = -1  # обновить кнопку в канале на следующем проходе
     else:
         html = (msg.html_text if msg is not None and msg.text else (ctx.text or "")).strip()
         if not html or len(html) > 1000:
@@ -283,10 +377,10 @@ async def op_ct_edit(ctx: Ctx) -> None:
     preview = svc.body(c) if draft else None
     await ctx.session.commit()
     await ctx.state.clear()
-    if draft:
+    if draft and field == "text":
         await show(ctx.target, preview, _preview_kb(cid))
     else:
-        await view(ctx.target, ctx.session, Adm(s="ct"))
+        await _texts_screen(ctx.target, ctx.session, cid)
 
 
 

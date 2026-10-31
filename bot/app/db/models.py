@@ -293,6 +293,14 @@ class Contest(Base):
     list_tpl: Mapped[str | None] = mapped_column(Text, nullable=True)  # шапка списка участников, {count}
     dm_tpl: Mapped[str | None] = mapped_column(Text, nullable=True)  # личное сообщение победителю
     channels: Mapped[list | None] = mapped_column(JSON, nullable=True)  # условия: подписка, до 5 каналов
+    btn_text: Mapped[str | None] = mapped_column(String(64), nullable=True)  # надпись на кнопке участия
+    pub_chat: Mapped[str | None] = mapped_column(String(64), nullable=True)  # пост в канале: для счётчика на кнопке
+    pub_msg: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    pub_count: Mapped[int] = mapped_column(Integer, default=0, server_default=ZERO)
+    mail_sent: Mapped[int] = mapped_column(Integer, default=0, server_default=ZERO)
+    mail_blocked: Mapped[int] = mapped_column(Integer, default=0, server_default=ZERO)
+    mail_failed: Mapped[int] = mapped_column(Integer, default=0, server_default=ZERO)
+    clicks_missing: Mapped[int] = mapped_column(Integer, default=0, server_default=ZERO)  # нажали без подписки
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     __table_args__ = (Index("ix_contests_status", "status", "ends_at"),)
