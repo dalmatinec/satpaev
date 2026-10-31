@@ -288,6 +288,8 @@ class Contest(Base):
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(12), default="draft", server_default=sql("'draft'"))
     winner_id: Mapped[int | None] = mapped_column(BigInteger)
+    entities: Mapped[list | None] = mapped_column(JSON, nullable=True)  # премиум эмодзи и форматирование текста
+    result: Mapped[str | None] = mapped_column(Text, nullable=True)  # текст поздравления, {winner} = имя победителя
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     __table_args__ = (Index("ix_contests_status", "status", "ends_at"),)

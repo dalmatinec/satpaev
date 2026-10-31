@@ -1,4 +1,4 @@
-"""Конкурс: пост с кнопкой «Участвовать», рассылка клиентам, итоги по таймеру."""
+"""Конкурс: пост с кнопкой «Участвовать», рассылка клиентам, итоги по таймеру, перевыбор победителя."""
 
 import asyncio
 import logging
@@ -8,18 +8,21 @@ from datetime import datetime
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
+from aiogram.types import MessageEntity
 from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..cb import Cn
 from ..config import config
 from ..db.models import Contest, ContestEntry, User
 from ..ui import btn, kb
-from ..utils import h, utcnow
+from ..utils import Rich, entities_from_store, h, u16, utcnow
 from .orders import notify_admins
 
 log = logging.getLogger(__name__)
 _tasks: set = set()
 DATE_RE = re.compile(r"^\s*(\d{1,2})\.(\d{1,2})\s+(\d{1,2}):(\d{2})\s*$")
+DEFAULT_RESULT = "🏆 Итоги конкурса! Победитель: {winner}. Поздравляем!"
 
 
 def parse_deadline(raw: str | None) -> datetime | None:
@@ -40,9 +43,15 @@ def deadline_text(c: Contest) -> str:
     return c.ends_at.astimezone(config.tz).strftime("%d.%m.%Y %H:%M")
 
 
-def body(c: Contest) -> str:
-    return (f"{c.text}\n\n⏳ Итоги: <b>{deadline_text(c)}</b> (время Алматы)\n\n"
-            "Нажмите «Участвовать», чтобы попасть в розыгрыш.")
+def body(c: Contest) -> Rich:
+    """Текст поста с сохранёнными премиум эмодзи и строкой с итогами (жирным)."""
+    head = c.text or ""
+    label = "\n\n⏳ Итоги: "
+    when = deadline_text(c)
+    text = head + label + when + " (время Алматы)\n\nНажмите «Участвовать», чтобы попасть в розыгрыш."
+    ents = list(entities_from_store(c.entities) or [])
+    ents.append(MessageEntity(type="bold", offset=u16(head + label), length=u16(when)))
+    return Rich(text, ents)
 
 
 def join_kb(cid: int):
@@ -60,7 +69,28 @@ def mention(uid: int, name: str) -> str:
     return f'<a href="tg://user?id={uid}">{h(name)}</a>'
 
 
-async def mailing(bot: Bot, sm, cid: int, text: str, admin_id: int) -> None:
+def result_html(c: Contest, winner_name: str) -> str:
+    """Текст поздравления с кликабельным именем победителя."""
+    return (c.result or DEFAULT_RESULT).replace("{winner}", mention(c.winner_id, winner_name))
+
+
+async def _send(bot: Bot, uid: int, rich: Rich, markup=None) -> str:
+    """ok / blocked / fail. Если Telegram не принял премиум эмодзи, шлём без них."""
+    ents = rich.entities or []
+    for variant in (ents, [e for e in ents if e.type != "custom_emoji"]):
+        try:
+            await bot.send_message(uid, rich.text, entities=variant or None, parse_mode=None, reply_markup=markup)
+            return "ok"
+        except TelegramForbiddenError:
+            return "blocked"
+        except TelegramRetryAfter:
+            raise
+        except TelegramBadRequest as e:
+            log.info("contest send to %s failed: %s", uid, e)
+    return "fail"
+
+
+async def mailing(bot: Bot, sm, cid: int, text: Rich, admin_id: int) -> None:
     sent = blocked = failed = 0
     last_id = 0
     try:
@@ -76,15 +106,16 @@ async def mailing(bot: Bot, sm, cid: int, text: str, admin_id: int) -> None:
             for uid in ids:
                 last_id = uid
                 try:
-                    await bot.send_message(uid, text, reply_markup=join_kb(cid))
-                    sent += 1
+                    res = await _send(bot, uid, text, join_kb(cid))
                 except TelegramRetryAfter as e:
                     await asyncio.sleep(e.retry_after + 1)
-                    failed += 1
-                except TelegramForbiddenError:
+                    res = "fail"
+                if res == "ok":
+                    sent += 1
+                elif res == "blocked":
                     blocked += 1
                     dead.append(uid)
-                except TelegramBadRequest:
+                else:
                     failed += 1
                 await asyncio.sleep(0.05)
             if dead:
@@ -103,39 +134,52 @@ async def mailing(bot: Bot, sm, cid: int, text: str, admin_id: int) -> None:
         pass
 
 
-def start_mailing(bot: Bot, sm, cid: int, text: str, admin_id: int) -> None:
+def start_mailing(bot: Bot, sm, cid: int, text: Rich, admin_id: int) -> None:
     task = asyncio.create_task(mailing(bot, sm, cid, text, admin_id))
     _tasks.add(task)
     task.add_done_callback(_tasks.discard)
 
 
+async def congratulate(bot: Bot, uid: int) -> None:
+    try:
+        await bot.send_message(uid, "🎉 Поздравляем, вы выиграли в конкурсе! "
+                                    "Свяжитесь по контактам из условий конкурса, чтобы получить приз.")
+    except (TelegramBadRequest, TelegramForbiddenError):
+        pass
+
+
+async def pick_other(session: AsyncSession, c: Contest) -> int | None:
+    """Новый победитель из участников, по возможности не тот же самый."""
+    uids = (await session.execute(
+        select(ContestEntry.user_id).where(ContestEntry.contest_id == c.id))).scalars().all()
+    others = [u for u in uids if u != c.winner_id] or uids
+    return random.choice(others) if others else None
+
+
 async def tick(bot: Bot, sm) -> None:
     """Раз в проход планировщика: подводит итоги конкурсов, у которых вышло время."""
-    results = []
+    notes = []
     async with sm() as session:
         due = (await session.execute(
             select(Contest).where(Contest.status == "active", Contest.ends_at <= utcnow())
         )).scalars().all()
         for c in due:
             uids = (await session.execute(
-                select(ContestEntry.user_id).where(ContestEntry.contest_id == c.id)
-            )).scalars().all()
+                select(ContestEntry.user_id).where(ContestEntry.contest_id == c.id))).scalars().all()
             winner = random.choice(uids) if uids else None
-            name = name_of(await session.get(User, winner), winner) if winner else ""
             c.status = "finished"
             c.winner_id = winner
-            results.append((len(uids), winner, name))
+            if winner is None:
+                notes.append((None, 0, "", ""))
+                continue
+            name = name_of(await session.get(User, winner), winner)
+            notes.append((winner, len(uids), name, result_html(c, name)))
         await session.commit()
-    for count, winner, name in results:
+    for winner, count, name, post in notes:
         if winner is None:
             await notify_admins(bot, "🎁 Конкурс завершён: участников не было.", None)
             continue
-        link = mention(winner, name)
-        await notify_admins(bot, f"🏆 <b>Конкурс завершён</b>\nУчастников: <b>{count}</b>\n\nПобедитель: {link}", None)
-        await notify_admins(bot, "Текст для поста (скопируйте и опубликуйте в канале):\n\n"
-                                 f"🏆 Итоги конкурса! Победитель: {link}. Поздравляем!", None)
-        try:
-            await bot.send_message(winner, "🎉 Поздравляем, вы выиграли в конкурсе! "
-                                           "Свяжитесь по контактам из условий конкурса, чтобы получить приз.")
-        except (TelegramBadRequest, TelegramForbiddenError):
-            pass
+        await notify_admins(bot, f"🏆 <b>Конкурс завершён</b>\nУчастников: <b>{count}</b>\n\n"
+                                 f"Победитель: {mention(winner, name)}", None)
+        await notify_admins(bot, "Текст поздравления (скопируйте и опубликуйте в канале):\n\n" + post, None)
+        await congratulate(bot, winner)
