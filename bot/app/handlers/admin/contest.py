@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...cb import Adm
+from ...config import config
 from ...db.models import Contest, ContestEntry, User
 from ...services import contest as svc
 from ...ui import answer, btn, kb, say, show
@@ -51,7 +52,8 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
                 f"Итоги: <b>{svc.deadline_text(active)}</b>, бот выберет победителя сам.\n"
                 f"Каналов в условиях: <b>{len(active.channels or [])}</b>\n\n"
                 f"Ссылка для поста в канале:\n<code>{link}</code>")
-        rows = [[btn("👥 Участники", Adm(s="ct", a="list", i=active.id))],
+        rows = [[btn("📢 Опубликовать в канал", Adm(s="ct", a="pub", i=active.id))],
+                [btn("👥 Участники", Adm(s="ct", a="list", i=active.id))],
                 [btn("📢 Каналы-условия", Adm(s="ct", a="chans", i=active.id))],
                 [btn("🎲 Подвести итоги сейчас", Adm(s="ct", a="end", i=active.id))],
                 [btn("⏹ Отменить конкурс", Adm(s="ct", a="cancel", i=active.id))]]
@@ -106,6 +108,19 @@ async def on_ct(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, st
             return
     if a == "chans":
         await _chans_screen(cb, session, cid)
+        return
+    if a == "pub":
+        c = await session.get(Contest, cid)
+        if c is None or c.status != "active":
+            await answer(cb, "Публиковать можно только идущий конкурс", alert=True)
+            return
+        if not config.channel_id:
+            await answer(cb, "Канал не задан: укажите CHANNEL_ID в .env", alert=True)
+            return
+        res = await svc._send(cb.bot, config.channel_id, svc.body(c), await svc.join_kb(cb.bot, cid))
+        msg = {"ok": "✅ Опубликовано в канал с кнопкой «Участвовать». Премиум эмодзи можно поправить в канале.",
+               "blocked": "⚠️ Бот не админ канала или нет права публиковать"}.get(res, "⚠️ Не удалось опубликовать, см. логи")
+        await answer(cb, msg, alert=True)
         return
     if a == "chadd":
         c = await session.get(Contest, cid)
