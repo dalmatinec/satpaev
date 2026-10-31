@@ -276,3 +276,31 @@ class PosterChannel(Base):
     title: Mapped[str] = mapped_column(String(256), default="", server_default=EMPTY)
     username: Mapped[str] = mapped_column(String(64), default="", server_default=EMPTY)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Contest(Base):
+    """Конкурс: текст (призы, условия), время итогов, статус draft/active/finished/cancelled."""
+
+    __tablename__ = "contests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    text: Mapped[str] = mapped_column(Text, default="", server_default=EMPTY)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(12), default="draft", server_default=sql("'draft'"))
+    winner_id: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    __table_args__ = (Index("ix_contests_status", "status", "ends_at"),)
+
+
+class ContestEntry(Base):
+    """Участник конкурса: одна запись на пользователя."""
+
+    __tablename__ = "contest_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contest_id: Mapped[int] = mapped_column(Integer, ForeignKey("contests.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    __table_args__ = (Index("ux_contest_entry", "contest_id", "user_id", unique=True),)

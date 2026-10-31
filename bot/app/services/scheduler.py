@@ -14,7 +14,7 @@ from ..config import config
 from ..db.models import Post, Reminder, SupportLink
 from ..ui import btn, kb
 from ..utils import utcnow
-from . import backup, posting, settings
+from . import backup, contest, posting, settings
 from .orders import notify_admins
 
 log = logging.getLogger(__name__)
@@ -91,6 +91,7 @@ async def run(bot: Bot, sm) -> None:
             await _reminders(bot, sm)
             await _daily_backup(bot, sm)
             await _midnight(sm)
+            await contest.tick(bot, sm)
             if time.monotonic() - last_cleanup > 3600:
                 await _cleanup(sm)
                 last_cleanup = time.monotonic()

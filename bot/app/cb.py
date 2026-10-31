@@ -44,3 +44,10 @@ class Sub(CallbackData, prefix="sb"):
     """Кнопки экрана подписки (не блокируются проверкой подписки)."""
 
     a: str
+
+
+class Cn(CallbackData, prefix="cn"):
+    """Кнопки конкурса: участие клиента под постом."""
+
+    a: str
+    i: int = 0

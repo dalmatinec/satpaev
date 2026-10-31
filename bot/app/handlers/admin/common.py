@@ -149,6 +149,7 @@ async def admin_menu(target, session: AsyncSession, cbd: Adm | None = None) -> N
         [btn("📢 Посты", Adm(s="ch")), btn("📨 Рассылка", Adm(s="bc"))],
         [btn("👤 Клиенты", Adm(s="cl")), btn("📊 Статистика", Adm(s="stat"))],
         [btn(f"📝 Отзывы · {new_reviews}", Adm(s="rev")), btn("🧩 Ещё", Adm(s="more"))],
+        [btn("🎁 Конкурс", Adm(s="ct"))],
         [btn("🏠 Меню клиента", Nav(to="menu"))],
     ))
 
