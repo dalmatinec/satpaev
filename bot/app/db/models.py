@@ -292,6 +292,7 @@ class Contest(Base):
     result: Mapped[str | None] = mapped_column(Text, nullable=True)  # текст поздравления, {winner} = имя победителя
     list_tpl: Mapped[str | None] = mapped_column(Text, nullable=True)  # шапка списка участников, {count}
     dm_tpl: Mapped[str | None] = mapped_column(Text, nullable=True)  # личное сообщение победителю
+    channels: Mapped[list | None] = mapped_column(JSON, nullable=True)  # условия: подписка, до 5 каналов
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     __table_args__ = (Index("ix_contests_status", "status", "ends_at"),)

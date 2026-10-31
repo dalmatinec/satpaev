@@ -1,6 +1,7 @@
 """Админка: конкурс. Тексты (все редактируются), предпросмотр, рассылка, участники, итоги, список для канала."""
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from sqlalchemy import func, select
@@ -10,7 +11,7 @@ from ...cb import Adm
 from ...db.models import Contest, ContestEntry, User
 from ...services import contest as svc
 from ...ui import answer, btn, kb, say, show
-from ...utils import entities_to_store, utcnow
+from ...utils import entities_to_store, h, utcnow
 from .common import Ctx, ask, op, screen
 
 router = Router(name="admin_contest")
@@ -36,6 +37,7 @@ async def _count(session: AsyncSession, cid: int) -> int:
 def _preview_kb(cid: int):
     return kb([btn("🚀 Запустить рассылку", Adm(s="ct", a="start", i=cid))],
               [btn("✏️ Изменить текст", Adm(s="ct", a="edit", i=cid, v="text"))],
+              [btn("📢 Каналы-условия", Adm(s="ct", a="chans", i=cid))],
               [btn("◀️ Отмена", Adm(s="ct", a="drop", i=cid))])
 
 
@@ -44,9 +46,13 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
     active = await _active(session)
     if active:
         count = await _count(session, active.id)
+        link = await svc.deep_link(target.bot, active.id)
         text = (f"🎁 <b>Конкурс идёт</b>\n\nУчастников: <b>{count}</b>\n"
-                f"Итоги: <b>{svc.deadline_text(active)}</b>, бот выберет победителя сам.")
+                f"Итоги: <b>{svc.deadline_text(active)}</b>, бот выберет победителя сам.\n"
+                f"Каналов в условиях: <b>{len(active.channels or [])}</b>\n\n"
+                f"Ссылка для поста в канале:\n<code>{link}</code>")
         rows = [[btn("👥 Участники", Adm(s="ct", a="list", i=active.id))],
+                [btn("📢 Каналы-условия", Adm(s="ct", a="chans", i=active.id))],
                 [btn("🎲 Подвести итоги сейчас", Adm(s="ct", a="end", i=active.id))],
                 [btn("⏹ Отменить конкурс", Adm(s="ct", a="cancel", i=active.id))]]
     else:
@@ -92,6 +98,36 @@ async def on_ct(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, st
         return
     if a == "list":
         await _show_list(cb, session, cid)
+        return
+    if a == "prev":
+        c = await session.get(Contest, cid)
+        if c is not None and c.status == "draft":
+            await show(cb, svc.body(c), _preview_kb(cid))
+            return
+    if a == "chans":
+        await _chans_screen(cb, session, cid)
+        return
+    if a == "chadd":
+        c = await session.get(Contest, cid)
+        if c is not None and len(c.channels or []) >= svc.MAX_CHANNELS:
+            await answer(cb, f"Максимум {svc.MAX_CHANNELS} каналов", alert=True)
+            return
+        await ask(cb, state, "ct_chadd",
+                  "➕ Пришлите канал:\n• публичный: <code>@channel</code> или <code>https://t.me/channel</code>\n"
+                  "• приватный: <code>-100id https://t.me/+ссылка</code>\n\n"
+                  "Бот должен быть админом в канале, иначе подписку проверить нельзя.",
+                  Adm(s="ct", a="chans", i=cid), cid=cid)
+        return
+    if a == "chdel":
+        c = await session.get(Contest, cid)
+        if c is not None:
+            chans = list(c.channels or [])
+            idx = int(field) if field.isdigit() else -1
+            if 0 <= idx < len(chans):
+                chans.pop(idx)
+                c.channels = chans or None
+                await session.commit()
+        await _chans_screen(cb, session, cid)
         return
     if a == "sendlist":
         c = await session.get(Contest, cid)
@@ -146,6 +182,25 @@ async def on_ct(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, st
         svc.start_mailing(cb.bot, sm, cid, text, cb.from_user.id)
         await answer(cb, "Рассылка запущена")
     await view(cb, session, callback_data)
+
+
+async def _chans_screen(target, session: AsyncSession, cid: int) -> None:
+    c = await session.get(Contest, cid)
+    if c is None:
+        await view(target, session, Adm(s="ct"))
+        return
+    chans = c.channels or []
+    lines = [f"{i}. {h(ch.get('title') or ch['chat'])} ({h(ch['chat'])})" for i, ch in enumerate(chans, 1)]
+    text = ("📢 <b>Каналы-условия</b>\n\nЧтобы участвовать, нужно подписаться на все эти каналы. "
+            f"Бот проверяет подписку при нажатии «Участвовать». До {svc.MAX_CHANNELS} каналов.\n\n"
+            + ("\n".join(lines) or "Каналов нет: участвовать может любой, кто запустил бота."))
+    rows = [[btn(f"🗑 {(ch.get('title') or ch['chat'])[:40]}", Adm(s="ct", a="chdel", i=cid, v=str(i)))]
+            for i, ch in enumerate(chans)]
+    if len(chans) < svc.MAX_CHANNELS:
+        rows.append([btn("➕ Добавить канал", Adm(s="ct", a="chadd", i=cid))])
+    back = Adm(s="ct", a="prev", i=cid) if c.status == "draft" else Adm(s="ct")
+    rows.append([btn("◀️ Назад", back)])
+    await show(target, text, kb(*rows))
 
 
 async def _show_list(cb: CallbackQuery, session: AsyncSession, cid: int) -> None:
@@ -218,3 +273,32 @@ async def op_ct_edit(ctx: Ctx) -> None:
     else:
         await view(ctx.target, ctx.session, Adm(s="ct"))
 
+
+
+@op("ct_chadd")
+async def op_ct_chadd(ctx: Ctx) -> None:
+    parsed = svc.parse_channel(ctx.text or "")
+    if parsed is None:
+        await say(ctx.target, "Не понял. Пример: <code>@newssatbox</code>")
+        return
+    chat, url = parsed
+    try:
+        info = await ctx.bot.get_chat(chat)
+        me = await ctx.bot.me()
+        member = await ctx.bot.get_chat_member(chat, me.id)
+    except (TelegramBadRequest, TelegramForbiddenError):
+        await say(ctx.target, "Бот не видит этот канал. Добавьте бота в канал админом и пришлите ещё раз.")
+        return
+    if member.status not in ("administrator", "creator"):
+        await say(ctx.target, "Бот не админ в этом канале, подписку проверить не получится. "
+                              "Сделайте бота админом и пришлите ещё раз.")
+        return
+    cid = ctx.data["cid"]
+    c = await ctx.session.get(Contest, cid)
+    if c is not None:
+        chans = [ch for ch in (c.channels or []) if ch["chat"] != chat]
+        chans.append({"chat": chat, "url": url, "title": info.title or chat})
+        c.channels = chans[: svc.MAX_CHANNELS]
+        await ctx.session.commit()
+    await ctx.state.clear()
+    await _chans_screen(ctx.target, ctx.session, cid)

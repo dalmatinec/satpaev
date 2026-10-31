@@ -56,6 +56,50 @@ def body(c: Contest) -> Rich:
     return Rich(text, ents)
 
 
+MAX_CHANNELS = 5
+MEMBER = {"member", "administrator", "creator"}
+
+
+def parse_channel(raw: str) -> tuple[str, str] | None:
+    """@channel, https://t.me/channel или «-100id https://t.me/+ссылка» для приватного."""
+    raw = (raw or "").strip()
+    m = re.match(r"^(-100\d+)\s+(https://t\.me/\S+)$", raw)
+    if m:
+        return m.group(1), m.group(2)
+    m = re.match(r"^(?:https?://)?(?:t\.me/|@)([A-Za-z][A-Za-z0-9_]{3,31})/?$", raw)
+    if m:
+        return "@" + m.group(1), f"https://t.me/{m.group(1)}"
+    return None
+
+
+async def missing_subs(bot: Bot, channels: list[dict] | None, user_id: int) -> list[dict]:
+    """Каналы из условий, на которые пользователь не подписан. Если бот не может проверить канал, не блокируем."""
+    missing = []
+    for ch in channels or []:
+        try:
+            member = await bot.get_chat_member(ch["chat"], user_id)
+        except (TelegramBadRequest, TelegramForbiddenError) as e:
+            log.warning("contest: не могу проверить подписку на %s: %s", ch.get("chat"), e)
+            continue
+        status = getattr(member, "status", "")
+        if status == "restricted" and getattr(member, "is_member", False):
+            continue
+        if status not in MEMBER:
+            missing.append(ch)
+    return missing
+
+
+def conditions_kb(cid: int, missing: list[dict]):
+    rows = [[btn(f"📢 {ch.get('title') or ch['chat']}", url=ch["url"])] for ch in missing if ch.get("url")]
+    rows.append([btn("✅ Проверить", Cn(a="check", i=cid))])
+    return kb(*rows)
+
+
+async def deep_link(bot: Bot, cid: int) -> str:
+    me = await bot.me()
+    return f"https://t.me/{me.username}?start=ct{cid}"
+
+
 def join_kb(cid: int):
     return kb([btn("🎉 Участвовать", Cn(a="join", i=cid))])
 
@@ -154,7 +198,8 @@ async def mailing(bot: Bot, sm, cid: int, text: Rich, admin_id: int) -> None:
         await bot.send_message(
             admin_id,
             f"✅ Конкурс разослан клиентам\n\nДоставлено: <b>{sent}</b>\nЗаблокировали бота: <b>{blocked}</b>\n"
-            f"Ошибок: <b>{failed}</b>\n\nНе забудьте опубликовать пост в канале и закрепить его.",
+            f"Ошибок: <b>{failed}</b>\n\nНе забудьте опубликовать пост в канале и закрепить его. "
+            f"Ссылка для участия из канала:\n<code>{await deep_link(bot, cid)}</code>",
         )
     except (TelegramBadRequest, TelegramForbiddenError):
         pass
