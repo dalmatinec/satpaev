@@ -107,7 +107,7 @@ async def deep_link(payload: str, message: Message, state: FSMContext, session: 
     if payload.startswith("ct") and payload[2:].isdigit():
         from . import contest
 
-        await contest.open_contest(message, session, int(payload[2:]))
+        await contest.open_contest(message, session, user, int(payload[2:]))
         return True
     if payload.startswith("un_"):
         uname = clean_username(payload[3:])

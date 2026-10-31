@@ -100,8 +100,9 @@ async def deep_link(bot: Bot, cid: int) -> str:
     return f"https://t.me/{me.username}?start=ct{cid}"
 
 
-def join_kb(cid: int):
-    return kb([btn("🎉 Участвовать", Cn(a="join", i=cid))])
+async def join_kb(bot: Bot, cid: int):
+    """Кнопка-ссылка: при пересылке в канал Telegram сохраняет только такие кнопки."""
+    return kb([btn("🎉 Участвовать", url=await deep_link(bot, cid))])
 
 
 def name_of(u: User | None, uid: int) -> str:
@@ -163,6 +164,7 @@ async def _send(bot: Bot, uid: int, rich: Rich, markup=None) -> str:
 async def mailing(bot: Bot, sm, cid: int, text: Rich, admin_id: int) -> None:
     sent = blocked = failed = 0
     last_id = 0
+    markup = await join_kb(bot, cid)
     try:
         while True:
             async with sm() as session:
@@ -176,7 +178,7 @@ async def mailing(bot: Bot, sm, cid: int, text: Rich, admin_id: int) -> None:
             for uid in ids:
                 last_id = uid
                 try:
-                    res = await _send(bot, uid, text, join_kb(cid))
+                    res = await _send(bot, uid, text, markup)
                 except TelegramRetryAfter as e:
                     await asyncio.sleep(e.retry_after + 1)
                     res = "fail"

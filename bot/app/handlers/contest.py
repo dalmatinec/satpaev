@@ -1,4 +1,5 @@
-"""Клиент: участие в конкурсе. Проверка условий (подписка на каналы) и запись в участники."""
+"""Клиент: участие в конкурсе. Кнопка «Участвовать» — ссылка t.me/bot?start=ct<id> (работает и из канала).
+Проверяем условия (подписка на каналы) и записываем в участники."""
 
 from contextlib import suppress
 
@@ -17,56 +18,49 @@ from ..utils import utcnow
 
 router = Router(name="contest")
 
-
-def _is_open(c: Contest | None) -> bool:
-    return c is not None and c.status == "active" and c.ends_at > utcnow()
+CLOSED, ALREADY, MISSING, JOINED = "closed", "already", "missing", "joined"
 
 
-async def open_contest(message: Message, session: AsyncSession, cid: int) -> None:
-    """Ссылка t.me/bot?start=ct<id> из поста в канале: показываем конкурс с кнопкой участия."""
+async def _try_join(bot, session: AsyncSession, user: User, cid: int) -> tuple[str, str, object]:
+    """Возвращает (итог, текст, клавиатура)."""
     c = await session.get(Contest, cid)
-    if not _is_open(c):
-        await message.answer("Этот конкурс уже завершён.")
-        return
-    await svc._send(message.bot, message.chat.id, svc.body(c), svc.join_kb(cid))
-
-
-@router.callback_query(Cn.filter(F.a.in_({"join", "check"})))
-async def join(cb: CallbackQuery, callback_data: Cn, session: AsyncSession, user: User) -> None:
-    checking = callback_data.a == "check"
-    c = await session.get(Contest, callback_data.i)
-    if not _is_open(c):
-        await answer(cb, "Конкурс уже завершён", alert=True)
-        return
-    cid, when, channels = c.id, svc.deadline_text(c), c.channels
+    if c is None or c.status != "active" or c.ends_at <= utcnow():
+        return CLOSED, "Этот конкурс уже завершён.", None
+    when, channels = svc.deadline_text(c), c.channels
     exists = await session.scalar(select(ContestEntry.id).where(
         ContestEntry.contest_id == cid, ContestEntry.user_id == user.id))
     if exists:
-        await answer(cb, "Вы уже участвуете. Удачи! 🍀")
-        return
-    missing = await svc.missing_subs(cb.bot, channels, user.id)
+        return ALREADY, f"Вы уже участвуете. Итоги: {when} (время Алматы). Удачи! 🍀", None
+    missing = await svc.missing_subs(bot, channels, user.id)
     if missing:
         text = "Чтобы участвовать, подпишитесь:\n\n" + "\n".join(
             f"• {ch.get('title') or ch['chat']}" for ch in missing) + "\n\nЗатем нажмите «✅ Проверить»."
-        if checking:
-            await answer(cb, "Подписка ещё не на все каналы", alert=True)
-            with suppress(TelegramBadRequest):
-                await cb.message.edit_text(text, reply_markup=svc.conditions_kb(cid, missing))
-        else:
-            await answer(cb)
-            await cb.message.answer(text, reply_markup=svc.conditions_kb(cid, missing))
-        return
+        return MISSING, text, svc.conditions_kb(cid, missing)
     session.add(ContestEntry(contest_id=cid, user_id=user.id))
     try:
         await session.commit()
-    except IntegrityError:  # двойной клик
+    except IntegrityError:  # двойное нажатие
         await session.rollback()
-        await answer(cb, "Вы уже участвуете. Удачи! 🍀")
-        return
-    done = f"✅ Вы участвуете! Итоги: {when}"
-    if checking:
-        await answer(cb, done)
-        with suppress(TelegramBadRequest):
-            await cb.message.edit_text(done + " (время Алматы). Удачи! 🍀")
+        return ALREADY, f"Вы уже участвуете. Итоги: {when} (время Алматы). Удачи! 🍀", None
+    return JOINED, f"✅ Вы участвуете! Итоги: {when} (время Алматы). Удачи! 🍀", None
+
+
+async def open_contest(message: Message, session: AsyncSession, user: User, cid: int) -> None:
+    """Нажатие «Участвовать» (ссылка t.me/bot?start=ct<id>) в личке или в канале."""
+    _, text, markup = await _try_join(message.bot, session, user, cid)
+    await message.answer(text, reply_markup=markup)
+
+
+@router.callback_query(Cn.filter(F.a.in_({"join", "check"})))
+async def on_button(cb: CallbackQuery, callback_data: Cn, session: AsyncSession, user: User) -> None:
+    """«✅ Проверить» под условиями (и старые кнопки «Участвовать», разосланные раньше)."""
+    status, text, markup = await _try_join(cb.bot, session, user, callback_data.i)
+    if status == MISSING and callback_data.a == "check":
+        await answer(cb, "Подписка ещё не на все каналы", alert=True)
     else:
-        await answer(cb, done, alert=True)
+        await answer(cb)
+    if callback_data.a == "check":
+        with suppress(TelegramBadRequest):
+            await cb.message.edit_text(text, reply_markup=markup)
+    else:
+        await cb.message.answer(text, reply_markup=markup)
