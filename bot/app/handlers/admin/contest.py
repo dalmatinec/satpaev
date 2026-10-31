@@ -1,4 +1,4 @@
-"""Админка: конкурс. Текст и время, предпросмотр, рассылка, участники, итоги, текст поздравления."""
+"""Админка: конкурс. Тексты (все редактируются), предпросмотр, рассылка, участники, итоги, список для канала."""
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
@@ -9,11 +9,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...cb import Adm
 from ...db.models import Contest, ContestEntry, User
 from ...services import contest as svc
-from ...utils import entities_to_store, utcnow
 from ...ui import answer, btn, kb, say, show
+from ...utils import entities_to_store, utcnow
 from .common import Ctx, ask, op, screen
 
 router = Router(name="admin_contest")
+
+FIELD_PROMPTS = {
+    "text": "✏️ <b>Текст поста</b>\n\nПришлите новый текст. Премиум эмодзи и форматирование сохранятся.",
+    "result": "✏️ <b>Текст поздравления</b> для канала. Вместо имени победителя поставьте <code>{winner}</code>. "
+              "Отправьте <code>-</code>, чтобы вернуть стандартный.",
+    "list_tpl": "✏️ <b>Шапка списка участников</b>. Вместо количества поставьте <code>{count}</code>. "
+                "Отправьте <code>-</code>, чтобы вернуть стандартную.",
+    "dm_tpl": "✏️ <b>Личное сообщение победителю</b>. Отправьте <code>-</code>, чтобы вернуть стандартное.",
+}
 
 
 async def _active(session: AsyncSession):
@@ -24,9 +33,10 @@ async def _count(session: AsyncSession, cid: int) -> int:
     return await session.scalar(select(func.count(ContestEntry.id)).where(ContestEntry.contest_id == cid)) or 0
 
 
-async def _winner_mention(session: AsyncSession, c: Contest) -> tuple[str, str]:
-    name = svc.name_of(await session.get(User, c.winner_id), c.winner_id)
-    return name, svc.mention(c.winner_id, name)
+def _preview_kb(cid: int):
+    return kb([btn("🚀 Запустить рассылку", Adm(s="ct", a="start", i=cid))],
+              [btn("✏️ Изменить текст", Adm(s="ct", a="edit", i=cid, v="text"))],
+              [btn("◀️ Отмена", Adm(s="ct", a="drop", i=cid))])
 
 
 @screen("ct")
@@ -50,14 +60,17 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
             text = (f"🎁 <b>Последний конкурс</b>\n\nИтоги: <b>{svc.deadline_text(last)}</b>\n"
                     f"Участников: <b>{count}</b>\n")
             if last.winner_id:
-                name, link = await _winner_mention(session, last)
-                text += (f"Победитель: {link}\n\n<b>Текст поздравления:</b>\n"
+                name = svc.name_of(await session.get(User, last.winner_id), last.winner_id)
+                text += (f"Победитель: {svc.mention(last.winner_id, name)}\n\n<b>Текст поздравления:</b>\n"
                          f"{svc.result_html(last, name)}")
                 rows.append([btn("🎲 Выбрать другого", Adm(s="ct", a="reroll", i=last.id))])
             else:
                 text += "\nУчастников не было."
             rows.append([btn("👥 Участники", Adm(s="ct", a="list", i=last.id))])
-            rows.append([btn("✏️ Текст поздравления", Adm(s="ct", a="res", i=last.id))])
+            rows.append([btn("📋 Прислать список для канала", Adm(s="ct", a="sendlist", i=last.id))])
+            rows.append([btn("✏️ Текст поздравления", Adm(s="ct", a="edit", i=last.id, v="result"))])
+            rows.append([btn("✏️ Шапка списка", Adm(s="ct", a="edit", i=last.id, v="list_tpl"))])
+            rows.append([btn("✏️ Личка победителю", Adm(s="ct", a="edit", i=last.id, v="dm_tpl"))])
     rows.append([btn("✍️ Новый конкурс", Adm(s="ct", a="new"))])
     rows.append([btn("◀️ Админка", Adm(s="menu"))])
     await show(target, text, kb(*rows))
@@ -65,7 +78,7 @@ async def view(target, session: AsyncSession, cbd: Adm) -> None:
 
 @router.callback_query(Adm.filter(F.s == "ct"))
 async def on_ct(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, state: FSMContext, sm) -> None:
-    a, cid = callback_data.a, callback_data.i
+    a, cid, field = callback_data.a, callback_data.i, callback_data.v
     if a == "new":
         if await _active(session):
             await answer(cb, "Сначала завершите или отмените текущий конкурс", alert=True)
@@ -74,13 +87,20 @@ async def on_ct(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, st
                   "🎁 <b>Новый конкурс</b>\n\nПришлите текст: призы, условия и куда писать за призом "
                   "(например @set_fact). Премиум эмодзи и форматирование сохранятся.", Adm(s="ct"))
         return
+    if a == "edit" and field in FIELD_PROMPTS:
+        await ask(cb, state, "ct_edit", FIELD_PROMPTS[field], Adm(s="ct"), cid=cid, field=field)
+        return
     if a == "list":
         await _show_list(cb, session, cid)
         return
-    if a == "res":
-        await ask(cb, state, "ct_result",
-                  "✏️ <b>Текст поздравления</b>\n\nПришлите новый текст. Вместо имени победителя поставьте "
-                  "<code>{winner}</code>: бот подставит кликабельное имя.", Adm(s="ct"), cid=cid)
+    if a == "sendlist":
+        c = await session.get(Contest, cid)
+        if c is None:
+            return
+        rows = await svc.participants(session, cid)
+        for chunk in svc.list_texts(c, rows):
+            await cb.bot.send_message(cb.from_user.id, chunk)
+        await answer(cb, "Список отправил в чат")
         return
     if a == "end":
         c = await session.get(Contest, cid)
@@ -108,8 +128,9 @@ async def on_ct(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, st
             await answer(cb, "Участников нет", alert=True)
             return
         c.winner_id = winner
+        dm = c.dm_tpl or svc.DEFAULT_DM
         await session.commit()
-        await svc.congratulate(cb.bot, winner)
+        await svc.congratulate(cb.bot, winner, dm)
         await answer(cb, "Победитель выбран заново")
     elif a == "start":
         c = await session.get(Contest, cid)
@@ -128,15 +149,12 @@ async def on_ct(cb: CallbackQuery, callback_data: Adm, session: AsyncSession, st
 
 
 async def _show_list(cb: CallbackQuery, session: AsyncSession, cid: int) -> None:
-    uids = (await session.execute(
-        select(ContestEntry.user_id).where(ContestEntry.contest_id == cid).order_by(ContestEntry.id))).scalars().all()
-    users = {}
-    if uids:
-        users = {u.id: u for u in (await session.execute(select(User).where(User.id.in_(uids)))).scalars().all()}
-    lines = [f"{i}. {svc.mention(uid, svc.name_of(users.get(uid), uid))}" for i, uid in enumerate(uids[:60], 1)]
-    more = f"\n… и ещё {len(uids) - 60}" if len(uids) > 60 else ""
-    text = f"👥 <b>Участники</b> ({len(uids)})\n\n" + ("\n".join(lines) or "Пока никого.") + more
-    await show(cb, text, kb([btn("◀️ Назад", Adm(s="ct"))]))
+    c = await session.get(Contest, cid)
+    if c is None:
+        return
+    chunks = svc.list_texts(c, await svc.participants(session, cid))
+    await show(cb, chunks[0] + "\n\nПолный список для канала: кнопка «📋 Прислать список для канала».",
+               kb([btn("◀️ Назад", Adm(s="ct"))]))
 
 
 @op("ct_text")
@@ -166,21 +184,37 @@ async def op_ct_time(ctx: Ctx) -> None:
     preview = svc.body(c)
     await ctx.session.commit()
     await ctx.state.clear()
-    await show(ctx.target, preview,
-               kb([btn("🚀 Запустить рассылку", Adm(s="ct", a="start", i=cid))],
-                  [btn("◀️ Отмена", Adm(s="ct", a="drop", i=cid))]))
+    await show(ctx.target, preview, _preview_kb(cid))
 
 
-@op("ct_result")
-async def op_ct_result(ctx: Ctx) -> None:
+@op("ct_edit")
+async def op_ct_edit(ctx: Ctx) -> None:
+    field, cid = ctx.data["field"], ctx.data["cid"]
     msg = ctx.message
-    html = (msg.html_text if msg is not None and msg.text else (ctx.text or "")).strip()
-    if not html or len(html) > 1000:
-        await say(ctx.target, "Нужен текст до 1000 символов. Пришлите ещё раз:")
+    c = await ctx.session.get(Contest, cid)
+    if c is None:
+        await ctx.state.clear()
+        await view(ctx.target, ctx.session, Adm(s="ct"))
         return
-    c = await ctx.session.get(Contest, ctx.data["cid"])
-    if c is not None:
-        c.result = html
-        await ctx.session.commit()
+    if field == "text":
+        plain = (msg.text if msg is not None and msg.text else (ctx.text or "")).strip()
+        if not plain or len(plain) > 3000:
+            await say(ctx.target, "Нужен текст до 3000 символов. Пришлите ещё раз:")
+            return
+        c.text = plain
+        c.entities = entities_to_store(msg.entities) if msg is not None and msg.text else []
+    else:
+        html = (msg.html_text if msg is not None and msg.text else (ctx.text or "")).strip()
+        if not html or len(html) > 1000:
+            await say(ctx.target, "Нужен текст до 1000 символов. Пришлите ещё раз:")
+            return
+        setattr(c, field, None if html == "-" else html)
+    draft = c.status == "draft"
+    preview = svc.body(c) if draft else None
+    await ctx.session.commit()
     await ctx.state.clear()
-    await view(ctx.target, ctx.session, Adm(s="ct"))
+    if draft:
+        await show(ctx.target, preview, _preview_kb(cid))
+    else:
+        await view(ctx.target, ctx.session, Adm(s="ct"))
+

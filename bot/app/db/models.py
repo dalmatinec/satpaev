@@ -290,6 +290,8 @@ class Contest(Base):
     winner_id: Mapped[int | None] = mapped_column(BigInteger)
     entities: Mapped[list | None] = mapped_column(JSON, nullable=True)  # премиум эмодзи и форматирование текста
     result: Mapped[str | None] = mapped_column(Text, nullable=True)  # текст поздравления, {winner} = имя победителя
+    list_tpl: Mapped[str | None] = mapped_column(Text, nullable=True)  # шапка списка участников, {count}
+    dm_tpl: Mapped[str | None] = mapped_column(Text, nullable=True)  # личное сообщение победителю
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     __table_args__ = (Index("ix_contests_status", "status", "ends_at"),)

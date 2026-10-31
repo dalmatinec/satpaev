@@ -1,4 +1,4 @@
-"""Конкурс: пост с кнопкой «Участвовать», рассылка клиентам, итоги по таймеру, перевыбор победителя."""
+"""Конкурс: пост с кнопкой «Участвовать», рассылка клиентам, итоги по таймеру, тексты для канала."""
 
 import asyncio
 import logging
@@ -23,6 +23,8 @@ log = logging.getLogger(__name__)
 _tasks: set = set()
 DATE_RE = re.compile(r"^\s*(\d{1,2})\.(\d{1,2})\s+(\d{1,2}):(\d{2})\s*$")
 DEFAULT_RESULT = "🏆 Итоги конкурса! Победитель: {winner}. Поздравляем!"
+DEFAULT_LIST = "👥 Участники конкурса ({count}):"
+DEFAULT_DM = "🎉 Поздравляем, вы выиграли в конкурсе! Свяжитесь по контактам из условий конкурса, чтобы получить приз."
 
 
 def parse_deadline(raw: str | None) -> datetime | None:
@@ -69,9 +71,33 @@ def mention(uid: int, name: str) -> str:
     return f'<a href="tg://user?id={uid}">{h(name)}</a>'
 
 
+async def participants(session: AsyncSession, cid: int) -> list[tuple[int, str]]:
+    uids = (await session.execute(
+        select(ContestEntry.user_id).where(ContestEntry.contest_id == cid).order_by(ContestEntry.id))).scalars().all()
+    if not uids:
+        return []
+    users = {u.id: u for u in (await session.execute(select(User).where(User.id.in_(uids)))).scalars().all()}
+    return [(uid, name_of(users.get(uid), uid)) for uid in uids]
+
+
 def result_html(c: Contest, winner_name: str) -> str:
     """Текст поздравления с кликабельным именем победителя."""
     return (c.result or DEFAULT_RESULT).replace("{winner}", mention(c.winner_id, winner_name))
+
+
+def list_texts(c: Contest, rows: list[tuple[int, str]]) -> list[str]:
+    """Список участников для канала, порциями по лимиту Telegram."""
+    head = (c.list_tpl or DEFAULT_LIST).replace("{count}", str(len(rows)))
+    chunks, cur = [], head
+    for i, (uid, name) in enumerate(rows, 1):
+        line = f"{i}. {mention(uid, name)}"
+        if len(cur) + len(line) + 1 > 3800:
+            chunks.append(cur)
+            cur = line
+        else:
+            cur += "\n" + line
+    chunks.append(cur)
+    return chunks
 
 
 async def _send(bot: Bot, uid: int, rich: Rich, markup=None) -> str:
@@ -140,18 +166,16 @@ def start_mailing(bot: Bot, sm, cid: int, text: Rich, admin_id: int) -> None:
     task.add_done_callback(_tasks.discard)
 
 
-async def congratulate(bot: Bot, uid: int) -> None:
+async def congratulate(bot: Bot, uid: int, text: str) -> None:
     try:
-        await bot.send_message(uid, "🎉 Поздравляем, вы выиграли в конкурсе! "
-                                    "Свяжитесь по контактам из условий конкурса, чтобы получить приз.")
+        await bot.send_message(uid, text)
     except (TelegramBadRequest, TelegramForbiddenError):
         pass
 
 
 async def pick_other(session: AsyncSession, c: Contest) -> int | None:
     """Новый победитель из участников, по возможности не тот же самый."""
-    uids = (await session.execute(
-        select(ContestEntry.user_id).where(ContestEntry.contest_id == c.id))).scalars().all()
+    uids = [uid for uid, _ in await participants(session, c.id)]
     others = [u for u in uids if u != c.winner_id] or uids
     return random.choice(others) if others else None
 
@@ -164,22 +188,26 @@ async def tick(bot: Bot, sm) -> None:
             select(Contest).where(Contest.status == "active", Contest.ends_at <= utcnow())
         )).scalars().all()
         for c in due:
-            uids = (await session.execute(
-                select(ContestEntry.user_id).where(ContestEntry.contest_id == c.id))).scalars().all()
-            winner = random.choice(uids) if uids else None
+            rows = await participants(session, c.id)
+            winner = random.choice(rows)[0] if rows else None
             c.status = "finished"
             c.winner_id = winner
             if winner is None:
-                notes.append((None, 0, "", ""))
+                notes.append({"winner": None})
                 continue
-            name = name_of(await session.get(User, winner), winner)
-            notes.append((winner, len(uids), name, result_html(c, name)))
+            name = next(n for uid, n in rows if uid == winner)
+            notes.append({"winner": winner, "count": len(rows), "name": name,
+                          "result": result_html(c, name), "lists": list_texts(c, rows),
+                          "dm": c.dm_tpl or DEFAULT_DM})
         await session.commit()
-    for winner, count, name, post in notes:
-        if winner is None:
+    for n in notes:
+        if n["winner"] is None:
             await notify_admins(bot, "🎁 Конкурс завершён: участников не было.", None)
             continue
-        await notify_admins(bot, f"🏆 <b>Конкурс завершён</b>\nУчастников: <b>{count}</b>\n\n"
-                                 f"Победитель: {mention(winner, name)}", None)
-        await notify_admins(bot, "Текст поздравления (скопируйте и опубликуйте в канале):\n\n" + post, None)
-        await congratulate(bot, winner)
+        await notify_admins(bot, f"🏆 <b>Конкурс завершён</b>\nУчастников: <b>{n['count']}</b>\n\n"
+                                 f"Победитель: {mention(n['winner'], n['name'])}", None)
+        await notify_admins(bot, "Текст поздравления (скопируйте и опубликуйте в канале):\n\n" + n["result"], None)
+        await notify_admins(bot, "Список участников для канала:", None)
+        for chunk in n["lists"]:
+            await notify_admins(bot, chunk, None)
+        await congratulate(bot, n["winner"], n["dm"])
